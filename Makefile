@@ -8,7 +8,11 @@ ifeq ($(uname), Darwin)
 	cc = clang
 endif
 
-objs = main.o server.o client.o utils.o miniaudio.o
+src_dir := ./src
+# objs = main.o server.o client.o utils.o miniaudio.o
+sources := $(wildcard $(src_dir)/*.c)
+objs := $(sources:.c=.o)
+includes := -I$(src_dir)
 
 usic : $(objs)
 	cc -Wall -o usic $(objs)
