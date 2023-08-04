@@ -10,6 +10,6 @@
 #define PIPE_TO_SERVER "to_server"
 #define PIPE_FROM_SERVER "from_server"
 #define NO_MESSAGE "No message"
-#define BAR_LENGTH 50
+#define BAR_LENGTH 100
 
 #endif // !USIC_CONFIG_H

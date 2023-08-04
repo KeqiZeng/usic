@@ -99,11 +99,17 @@ int cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs, i
 		}
 
 		result = setCursor(pEngine, pSound, args[1]);
-		if (result != MA_SUCCESS) {
-			perror("Failed to set cursot");
+		if (result != MA_SUCCESS && result != MA_INVALID_ARGS) {
+			perror("Failed to set cursor");
 			return result;
 		}
-		sendMessageToClient(fd_fromServer, NO_MESSAGE);
+		if (result == MA_INVALID_ARGS) {
+			sendMessageToClient(fd_fromServer, "Invalid time");
+			result = 0; // reset result to avoid server collapse
+		} else{
+			// setCursor successfully
+			sendMessageToClient(fd_fromServer, NO_MESSAGE);
+		}
 	} else if (strncmp(args[0], "volume-up", 9) == 0) {
 		// usic volume-up
 		result = adjustVolume(pEngine, VOLUME_DIFF);
@@ -245,7 +251,7 @@ int server(ma_engine* pEngine, ma_sound* pSound) {
 				if ((bool)ma_sound_is_playing(pSound)) {
 					if ((bool)ma_sound_at_end(pSound)) {
 						ma_sound_uninit(pSound);
-						result = ma_sound_init_from_file(pEngine, "/Users/ketch/Music/Music/Media.localized/Music/Unknown Artist/Unknown Album/Beyond-情人.wav", MA_SOUND_FLAG_NO_PITCH | MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC, NULL, NULL, pSound);
+						result = ma_sound_init_from_file(pEngine, "/Users/ketch/Music/Music/Media.localized/Music/Unknown Artist/Unknown Album/赵雷-我记得.wav", MA_SOUND_FLAG_NO_PITCH | MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC, NULL, NULL, pSound);
 						if (result != MA_SUCCESS) {
 								return result;
 						}

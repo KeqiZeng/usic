@@ -14,7 +14,7 @@
  */
 static char* secondsToTimeStr(int seconds) {
 	if (seconds < 0) {
-		printf("Error: Input must be a non-negative integer.\n");
+		perror("Error: Input must be a non-negative integer");
 		return NULL;
 	}
 
@@ -27,7 +27,7 @@ static char* secondsToTimeStr(int seconds) {
 	// Allocate memory for the result string
 	char *result = (char*) malloc(strLength * sizeof(char));
 	if (result == NULL) {
-		printf("Error: Memory allocation failed.\n");
+		perror("Error: Memory allocation failed");
 		return NULL;
 	}
 	
@@ -47,7 +47,7 @@ static int timeStrToSeconds(const char* timeString) {
 	// Convert
 	if (sscanf(timeString, "%d:%d", &minutes, &seconds) == 2) {
 
-		// minitues should be greater than 0
+		// minitues should not be less than 0
 		if (minutes < 0) {
 			return -1;
 		}
@@ -62,6 +62,30 @@ static int timeStrToSeconds(const char* timeString) {
 	}
 }
 
+int serverIsRunning() {
+	char buffer[256];
+	int running = 0;
+
+	FILE* fp = popen("ps -e -o comm=", "r");
+	if (fp == NULL) {
+		perror("Failed to execute ps command");
+		return -1;
+	}
+
+	while (fgets(buffer, sizeof(buffer), fp) != NULL) {
+		// Remove the trailing newline character
+		buffer[strcspn(buffer, "\n")] = '\0';
+
+		if (strncmp(buffer, "usic server", 11) == 0) {
+				running = 1;
+				break;
+		}
+	}
+
+	pclose(fp);
+
+	return running;
+}
 
 /*
  * Redirect the standard error stream
@@ -102,8 +126,8 @@ void setupRuntime() {
 		}
 	}
 
-	// fclose(stdin);
-	// fclose(stdout);
+	fclose(stdin);
+	fclose(stdout);
 	
 	redirectStderr();
 }
@@ -152,85 +176,85 @@ char* addQuotesIfNeeded(const char* str) {
  * Parse a string, which separated by " ", into several arguments
  */
 char** argsParser(const char* str, int* numArgs) {
-    char** args = NULL;
-    int argCount = 0;
-    int maxArgs = 10; // Initial size for the tokens array, can be adjusted based on expected number of tokens
+	char** args = NULL;
+	int argCount = 0;
+	int maxArgs = 10; // Initial size for the tokens array, can be adjusted based on expected number of tokens
 
-    args = (char**)malloc(maxArgs * sizeof(char*));
-    if (args == NULL) {
-        perror("Failed to allocate memory");
-        return NULL;
-    }
+	args = (char**)malloc(maxArgs * sizeof(char*));
+	if (args == NULL) {
+		perror("Failed to allocate memory");
+		return NULL;
+	}
 
-    int i = 0;
-    int inQuote = 0; // State variable to track whether we are inside a quote
+	int i = 0;
+	int inQuote = 0; // State variable to track whether we are inside a quote
 
-    while (*str != '\0') {
-        if (*str == ' ' && !inQuote) {
-            // Found a space outside of a quote, terminate the token and move to the next one
-            if (i > 0) {
-                args[argCount] = (char*)malloc(i + 1);
-                strncpy(args[argCount], str - i, i);
-                args[argCount][i] = '\0';
-                argCount++;
-                i = 0;
-            }
-        } else if (*str == '"') {
-            // Toggle the inQuote state when we encounter a double quote
-            inQuote = !inQuote;
-            if (!inQuote && i > 0) {
-                args[argCount] = (char*)malloc(i + 1);
-                strncpy(args[argCount], str - i, i);
-                args[argCount][i] = '\0';
-                argCount++;
-                i = 0;
-            }
-        } else {
-            // Add the character to the token
-            i++;
-        }
-
-        str++;
-        
-        // Resize the tokens array if needed
-        if (argCount >= maxArgs) {
-            maxArgs *= 2;
-            args = (char**)realloc(args, maxArgs * sizeof(char*));
-            if (args == NULL) {
-                perror("Failed to allocate memory");
-                return NULL;
-            }
-        }
-    }
-
-    // Process the last token
-    if (i > 0) {
-        args[argCount] = (char*)malloc(i + 1);
-        strncpy(args[argCount], str - i, i);
-        args[argCount][i] = '\0';
-        argCount++;
-    }
-
-    // Resize the tokens array to the exact size
-    args = (char**)realloc(args, argCount * sizeof(char*));
-    if (args == NULL) {
-        perror("Failed to allocate memory");
-        return NULL;
-    }
-		
-		
-		for (int i = 0; i < argCount; i++) {
-				char* arg = args[i];
-
-				// Remove double quotes from the token, if present
-				if (arg[0] == '"' && arg[strlen(arg) - 1] == '"') {
-						arg[strlen(arg) - 1] = '\0'; // Remove the closing double quote
-						arg++; // Move the pointer one position ahead to remove the opening double quote
-				}
+	while (*str != '\0') {
+		if (*str == ' ' && !inQuote) {
+			// Found a space outside of a quote, terminate the token and move to the next one
+			if (i > 0) {
+					args[argCount] = (char*)malloc(i + 1);
+					strncpy(args[argCount], str - i, i);
+					args[argCount][i] = '\0';
+					argCount++;
+					i = 0;
+			}
+		} else if (*str == '"') {
+			// Toggle the inQuote state when we encounter a double quote
+			inQuote = !inQuote;
+			if (!inQuote && i > 0) {
+					args[argCount] = (char*)malloc(i + 1);
+					strncpy(args[argCount], str - i, i);
+					args[argCount][i] = '\0';
+					argCount++;
+					i = 0;
+			}
+		} else {
+			// Add the character to the token
+			i++;
 		}
 
-    *numArgs = argCount;
-    return args;
+		str++;
+		
+		// Resize the tokens array if needed
+		if (argCount >= maxArgs) {
+			maxArgs *= 2;
+			args = (char**)realloc(args, maxArgs * sizeof(char*));
+			if (args == NULL) {
+					perror("Failed to allocate memory");
+					return NULL;
+			}
+		}
+	}
+
+	// Process the last token
+	if (i > 0) {
+		args[argCount] = (char*)malloc(i + 1);
+		strncpy(args[argCount], str - i, i);
+		args[argCount][i] = '\0';
+		argCount++;
+	}
+
+	// Resize the tokens array to the exact size
+	args = (char**)realloc(args, argCount * sizeof(char*));
+	if (args == NULL) {
+		perror("Failed to allocate memory");
+		return NULL;
+	}
+	
+	
+	for (int i = 0; i < argCount; i++) {
+		char* arg = args[i];
+
+		// Remove double quotes from the token, if present
+		if (arg[0] == '"' && arg[strlen(arg) - 1] == '"') {
+			arg[strlen(arg) - 1] = '\0'; // Remove the closing double quote
+			arg++; // Move the pointer one position ahead to remove the opening double quote
+		}
+	}
+
+	*numArgs = argCount;
+	return args;
 }
 
 /*
@@ -261,7 +285,7 @@ ma_result playToggle(ma_sound* pSound) {
  *      ^                ^            ^
  *	has_been_played     now     will_be_played
  *
- * BAR_LENGTH is used to control the length of bar, default value is 50,
+ * BAR_LENGTH is used to control the length of bar, default value is 100,
  * which means that an element ("-" or "o") indicates 2% of the playing progress.
  */
 ma_result getCurrentProgress(ma_sound* pSound, char** progress) {
@@ -376,8 +400,7 @@ ma_result setCursor(ma_engine* pEngine, ma_sound* pSound, const char* time) {
 	
 	// Error handling
 	if (destination == -1) {
-		printf("Invalid input\n");
-		return MA_SUCCESS;
+		return MA_INVALID_ARGS;
 	}
 
 	// Get the total length of the sound
@@ -386,7 +409,7 @@ ma_result setCursor(ma_engine* pEngine, ma_sound* pSound, const char* time) {
     return result;
 	}
 
-	int lenInt = (int) round(length);
+	int lenInt = (int) length; // must be rounded down
 
 	// Calculate the destination
 	destination = destination < 0? 0 : destination > lenInt? lenInt : destination;
@@ -442,13 +465,3 @@ ma_result getVolume(ma_engine* pEngine, char** volume) {
 	snprintf(*volume, 15, "Volume: %.1f%%", currentVolume * 100); // '%' need to escape in printf
 	return result;
 }
-
-// void setSingleLoop(ma_sound* pSound, bool mode, char** status) {
-// 	if ((bool)ma_sound_is_looping(pSound)) {
-// 		ma_sound_set_looping(pSound, (ma_bool32)mode);
-// 		*status = "single-loop: off";
-// 	} else {
-// 		ma_sound_set_looping(pSound, (ma_bool32)mode);
-// 		*status = "single-loop: on";
-// 	}
-// }
