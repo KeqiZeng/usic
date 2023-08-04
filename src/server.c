@@ -41,12 +41,12 @@ static void sendMessageToClient(int fd_fromServer, char* message) {
  */
 int cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs, int fd_fromServer, bool* loopFlag) {
 	int result = 0;
-	if (strncmp(args[0], "quit", 4) == 0) {
+	if (strcmp(args[0], "quit") == 0) {
 		// usic quit
 		sendMessageToClient(fd_fromServer, "The server of usic quit successfully");
 		free(args);
 		*loopFlag = false;
-	} else if (strncmp(args[0], "play", 4) == 0) {
+	} else if (strcmp(args[0], "play") == 0) {
 		// usic play
 		result = play(pEngine, pSound, args, numArgs);
 		if (result != MA_SUCCESS) {
@@ -54,7 +54,7 @@ int cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs, i
 			return result;
 		}
 		sendMessageToClient(fd_fromServer, NO_MESSAGE);
-	} else if (strncmp(args[0], "progress", 8) == 0) {
+	} else if (strcmp(args[0], "progress") == 0) {
 		// usic progress
 		char* progress;
 		result = getCurrentProgress(pSound, &progress);
@@ -67,7 +67,7 @@ int cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs, i
 			perror("Failed to write to named pipe");
 		}
 		free(progress);
-	} else if (strncmp(args[0], "toggle", 6) == 0) {
+	} else if (strcmp(args[0], "play-toggle") == 0) {
 		// usic toggle
 		result = playToggle(pSound);
 		if (result != MA_SUCCESS) {
@@ -75,7 +75,7 @@ int cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs, i
 			return result;
 		}
 		sendMessageToClient(fd_fromServer, NO_MESSAGE);
-	} else if (strncmp(args[0], "forward", 7) == 0) {
+	} else if (strcmp(args[0], "forward") == 0) {
 		// usic forward
 		result = moveCursor(pEngine, pSound, CURSOR_DIFF);
 		if (result != MA_SUCCESS) {
@@ -83,7 +83,7 @@ int cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs, i
 			return result;
 		}
 		sendMessageToClient(fd_fromServer, NO_MESSAGE);
-	} else if (strncmp(args[0], "backward", 8) == 0) {
+	} else if (strcmp(args[0], "backward") == 0) {
 		// usic backward
 		result = moveCursor(pEngine, pSound, -CURSOR_DIFF);
 		if (result != MA_SUCCESS) {
@@ -91,7 +91,7 @@ int cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs, i
 			return result;
 		}
 		sendMessageToClient(fd_fromServer, NO_MESSAGE);
-	} else if (strncmp(args[0], "set-cursor", 10) == 0) {
+	} else if (strcmp(args[0], "set-cursor") == 0) {
 		// usic set-cursor
 		if (numArgs < 2) {
 			perror("Not enough arguments");
@@ -110,7 +110,7 @@ int cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs, i
 			// setCursor successfully
 			sendMessageToClient(fd_fromServer, NO_MESSAGE);
 		}
-	} else if (strncmp(args[0], "volume-up", 9) == 0) {
+	} else if (strcmp(args[0], "volume-up") == 0) {
 		// usic volume-up
 		result = adjustVolume(pEngine, VOLUME_DIFF);
 		if (result != MA_SUCCESS) {
@@ -118,7 +118,7 @@ int cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs, i
 			return result;
 		}
 		sendMessageToClient(fd_fromServer, NO_MESSAGE);
-	} else if (strncmp(args[0], "volume-down", 11) == 0) {
+	} else if (strcmp(args[0], "volume-down") == 0) {
 		// usic volume-down
 		result = adjustVolume(pEngine, -VOLUME_DIFF);
 		if (result != MA_SUCCESS) {
@@ -126,7 +126,7 @@ int cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs, i
 			return result;
 		}
 		sendMessageToClient(fd_fromServer, NO_MESSAGE);
-	} else if (strncmp(args[0], "get-volume", 10) == 0) {
+	} else if (strcmp(args[0], "get-volume") == 0) {
 		// usic get-volume
 		char* volume;
 		result = getVolume(pEngine, &volume);
@@ -136,14 +136,21 @@ int cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs, i
 		}
 		sendMessageToClient(fd_fromServer, volume);
 		free(volume);
-	} else if (strncmp(args[0], "single-loop-on", 14) == 0) {
+	} else if (strcmp(args[0], "single-loop-on") == 0) {
 		// usic single-loop-on
 		ma_sound_set_looping(pSound, (ma_bool32)true);
 		sendMessageToClient(fd_fromServer, "single-loop: on");
-	} else if (strncmp(args[0], "single-loop-off", 15) == 0) {
+	} else if (strcmp(args[0], "single-loop-off") == 0) {
 		// usic single-loop-off
 		ma_sound_set_looping(pSound, (ma_bool32)false);
 		sendMessageToClient(fd_fromServer, "single-loop: off");
+	} else if (strcmp(args[0], "mute-toggle") == 0) {
+		result = muteToggle(pEngine);
+		if (result != MA_SUCCESS) {
+			perror("Failed to toggle mute");
+			return result;
+		}
+		sendMessageToClient(fd_fromServer, NO_MESSAGE);
 	}
 	else {
 		char* message = (char*) malloc((strlen(args[0])+strlen("Unknown command")+1) * sizeof(char));
@@ -175,7 +182,7 @@ ma_result play(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs) {
 		return result;
 	}
 	ma_sound_start(pSound);
-	if (numArgs >= 3 && strncmp(args[2], "--single-loop", 13) == 0) {
+	if (numArgs >= 3 && strcmp(args[2], "--single-loop") == 0) {
 		ma_sound_set_looping(pSound, (ma_bool32)true);
 	}
 	return MA_SUCCESS;

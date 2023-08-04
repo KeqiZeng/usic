@@ -76,7 +76,7 @@ int serverIsRunning() {
 		// Remove the trailing newline character
 		buffer[strcspn(buffer, "\n")] = '\0';
 
-		if (strncmp(buffer, "usic server", 11) == 0) {
+		if (strcmp(buffer, "usic server") == 0) {
 				running = 1;
 				break;
 		}
@@ -464,4 +464,26 @@ ma_result getVolume(ma_engine* pEngine, char** volume) {
 	// strcat(volume, )
 	snprintf(*volume, 15, "Volume: %.1f%%", currentVolume * 100); // '%' need to escape in printf
 	return result;
+}
+
+ma_result muteToggle(ma_engine* pEngine) {
+  ma_result result;
+	ma_device* pDevice = ma_engine_get_device(pEngine);
+	float currentVolume = 0.0;
+	result = ma_device_get_master_volume(pDevice, &currentVolume);
+	if (result != MA_SUCCESS) {
+		return result;
+	}
+	if (currentVolume == 0.0F) {
+		result = ma_device_set_master_volume(pDevice, 1.0F);
+		if (result != MA_SUCCESS) {
+			return result;
+		}
+	} else {
+		result = ma_device_set_master_volume(pDevice, 0.0F);
+		if (result != MA_SUCCESS) {
+			return result;
+		}
+	}
+	return MA_SUCCESS;
 }

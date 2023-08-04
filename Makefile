@@ -1,21 +1,21 @@
 # Makefile
 
-cc = gcc
+CC = gcc
 
-uname := $(shell uname)
+UNAME := $(shell uname)
 
-ifeq ($(uname), Darwin)
-	cc = clang
+ifeq ($(UNAME), Darwin)
+	CC = clang
 endif
 
-src_dir := ./src
+SRC_DIR := ./src
 # objs = main.o server.o client.o utils.o miniaudio.o
-sources := $(wildcard $(src_dir)/*.c)
-objs := $(sources:.c=.o)
-includes := -I$(src_dir)
+SOURCES := $(wildcard $(SRC_DIR)/*.c)
+OBJS := $(SOURCES:.c=.o)
+INCLUDES := -I$(SRC_DIR)
 
-usic : $(objs)
-	cc -Wall -o usic $(objs)
+usic : $(OBJS)
+	cc -Wall -Wextra -o usic $(OBJS)
 
 main.o : server.h client.h utils.h
 server.o : server.h config.h utils.h
@@ -23,6 +23,9 @@ client.o : client.h config.h utils.h
 utils.o : utils.h config.h
 miniaudio.o : miniaudio.h
 
-.PHONY : clean
+.PHONY : clean install
 clean :
-	rm usic $(objs)
+	rm -f usic $(OBJS)
+
+install : usic
+	install -m 755 usic /usr/local/bin

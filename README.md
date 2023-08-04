@@ -1,1 +1,11 @@
-# This project is in development
+```txt
+                                                    _     
+                                        __  _______(_)____
+                                       / / / / ___/ / ___/
+                                      / /_/ (__  ) / /__  
+                                     / __,_/____/_/\___/  
+                                    /_/                   
+
+```
+
+## This project is in development
