@@ -1,5 +1,5 @@
-#include <string.h>
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <fcntl.h>
@@ -51,6 +51,13 @@ int cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs, i
 		result = play(pEngine, pSound, args, numArgs);
 		if (result != MA_SUCCESS) {
 			perror("Failed to play the music");
+			return result;
+		}
+		sendMessageToClient(fd_fromServer, NO_MESSAGE);
+	} else if (strcmp(args[0], "play-list") == 0){
+		result = playList(pEngine, pSound, args, numArgs);
+		if (result != MA_SUCCESS) {
+			perror("Failed to play the list of musics");
 			return result;
 		}
 		sendMessageToClient(fd_fromServer, NO_MESSAGE);
@@ -185,6 +192,39 @@ ma_result play(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs) {
 	if (numArgs >= 3 && strcmp(args[2], "--single-loop") == 0) {
 		ma_sound_set_looping(pSound, (ma_bool32)true);
 	}
+	return MA_SUCCESS;
+}
+
+/*
+ * Play a list of musics one by one
+ */
+ma_result playList(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs) {
+	ma_result result;
+	if (numArgs < 2) {
+		perror("Not enough arguments");
+		return MA_INVALID_ARGS;
+	}
+	const char* musicList = args[1];
+	FILE* fp = fopen(musicList, "r");
+	if (fp == NULL) {
+		perror("Failed to open music list file");
+		return MA_ERROR;
+	}
+	char music[512];
+	if (fgets(music, sizeof(music), fp) == NULL) {
+		perror("Failed to read a music from the list file");
+		return MA_ERROR;
+	}
+	size_t newLinePos = strcspn(music, "\n");
+	music[newLinePos] = '\0';
+	ma_sound_uninit(pSound);
+	result = ma_sound_init_from_file(pEngine, music, MA_SOUND_FLAG_NO_PITCH | MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC, NULL, NULL, pSound);
+	if (result != MA_SUCCESS) {
+		perror(music);
+		perror("Failed to initialize sound");
+		return result;
+	}
+	ma_sound_start(pSound);
 	return MA_SUCCESS;
 }
 

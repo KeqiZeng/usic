@@ -9,3 +9,5 @@
 ```
 
 ## This project is in development
+
+![GitHub file size in bytes](https://img.shields.io/github/size/KeqiZeng/usic/usic?color=green&label=usic&logo=usic%20size&style=flat-square)
