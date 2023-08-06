@@ -47,13 +47,18 @@ ma_result cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numA
 		*loopFlag = false;
 	} else if (strcmp(args[0], "play") == 0) {
 		// usic play
-		result = play(pEngine, pSound, args, numArgs);
-		if (result != MA_SUCCESS) {
-			perror("Failed to play the music");
-			free(args);
-			return result;
+		if (numArgs < 2) {
+			sendMessageToClient(fd_fromServer, "Need an audio file to play");
+		} else {
+			result = play(pEngine, pSound, args[1]);
+			if (result != MA_SUCCESS) {
+				perror("Failed to play the music");
+				free(args);
+				return result;
+			} else {
+				sendMessageToClient(fd_fromServer, NO_MESSAGE);
+			}
 		}
-		sendMessageToClient(fd_fromServer, NO_MESSAGE);
 	} else if (strcmp(args[0], "play-list") == 0){
 		result = playList(pEngine, pSound, args, numArgs);
 		if (result != MA_SUCCESS) {
@@ -71,12 +76,7 @@ ma_result cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numA
 			free(args);
 			return result;
 		}
-		ssize_t bytes_written = write(fd_fromServer, progress, 256 * sizeof(char));
-		if (bytes_written == -1) {
-			perror("Failed to write to named pipe");
-			free(args);
-			return MA_ERROR;
-		}
+		sendMessageToClient(fd_fromServer, progress);
 		free(progress);
 	} else if (strcmp(args[0], "play-toggle") == 0) {
 		// usic toggle
@@ -108,23 +108,21 @@ ma_result cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numA
 	} else if (strcmp(args[0], "set-cursor") == 0) {
 		// usic set-cursor
 		if (numArgs < 2) {
-			perror("Not enough arguments");
-			free(args);
-			return MA_INVALID_ARGS;
-		}
-
-		result = setCursor(pEngine, pSound, args[1]);
-		if (result != MA_SUCCESS && result != MA_INVALID_ARGS) {
-			perror("Failed to set cursor");
-			free(args);
-			return result;
-		}
-		if (result == MA_INVALID_ARGS) {
-			sendMessageToClient(fd_fromServer, "Invalid time");
-			result = MA_SUCCESS; // reset result to avoid server collapse
-		} else{
-			// setCursor successfully
-			sendMessageToClient(fd_fromServer, NO_MESSAGE);
+			sendMessageToClient(fd_fromServer, "Need a time to set the cursor");
+		} else {
+			result = setCursor(pEngine, pSound, args[1]);
+			if (result != MA_SUCCESS && result != MA_INVALID_ARGS) {
+				perror("Failed to set cursor");
+				free(args);
+				return result;
+			}
+			if (result == MA_INVALID_ARGS) {
+				sendMessageToClient(fd_fromServer, "Invalid time");
+				result = MA_SUCCESS; // reset result to avoid server collapse
+			} else{
+				// setCursor successfully
+				sendMessageToClient(fd_fromServer, NO_MESSAGE);
+			}
 		}
 	} else if (strcmp(args[0], "volume-up") == 0) {
 		// usic volume-up
@@ -193,13 +191,8 @@ ma_result cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numA
 /*
  * Play a music immediately
  */
-ma_result play(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs) {
+ma_result play(ma_engine* pEngine, ma_sound* pSound, char* music) {
 	ma_result result;
-	if (numArgs < 2) {
-		perror("Not enough arguments");
-		return MA_INVALID_ARGS;
-	}
-	char* music = args[1];
 	ma_sound_uninit(pSound);
 	result = ma_sound_init_from_file(pEngine, music, MA_SOUND_FLAG_NO_PITCH | MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC, NULL, NULL, pSound);
 	if (result != MA_SUCCESS) {
@@ -207,14 +200,11 @@ ma_result play(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs) {
 		return result;
 	}
 	ma_sound_start(pSound);
-	if (numArgs >= 3 && strcmp(args[2], "--single-loop") == 0) {
-		ma_sound_set_looping(pSound, (ma_bool32)true);
-	}
 	return MA_SUCCESS;
 }
 
 /*
- * Play a list of musics one by one
+ * Play a list of musics one by one TODO: need to rewrite
  */
 ma_result playList(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs) {
 	ma_result result;
