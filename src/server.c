@@ -12,21 +12,21 @@
 #include "./utils.h"
 #include "./server.h"
 
-static int pipeInit(const char* pipeFolder, const char* pipePath) {
+static ma_result pipeInit(const char* pipeFolder, const char* pipePath) {
 	if (access(pipePath, F_OK) != -1) {
 		// if named pipe exists, delete it for initializing
 		if (unlink(pipePath) == -1) {
 			perror("Failed to delete named pipe");
-			return 1;
+			return MA_ERROR;
 		}
 	}
 
 	int err = mkfifo(pipePath, 0666);
 	if (err == -1) {
 		perror("Failed to create named pipe");
-		return 1;
+		return MA_ERROR;
 	}
-	return 0;
+	return MA_SUCCESS;
 }
 
 static void sendMessageToClient(int fd_fromServer, char* message) {
@@ -39,18 +39,18 @@ static void sendMessageToClient(int fd_fromServer, char* message) {
 /*
  * Manage the command from usic client
  */
-int cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs, int fd_fromServer, bool* loopFlag) {
-	int result = 0;
+ma_result cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs, int fd_fromServer, bool* loopFlag) {
+	ma_result result;
 	if (strcmp(args[0], "quit") == 0) {
 		// usic quit
 		sendMessageToClient(fd_fromServer, "The server of usic quit successfully");
-		free(args);
 		*loopFlag = false;
 	} else if (strcmp(args[0], "play") == 0) {
 		// usic play
 		result = play(pEngine, pSound, args, numArgs);
 		if (result != MA_SUCCESS) {
 			perror("Failed to play the music");
+			free(args);
 			return result;
 		}
 		sendMessageToClient(fd_fromServer, NO_MESSAGE);
@@ -58,6 +58,7 @@ int cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs, i
 		result = playList(pEngine, pSound, args, numArgs);
 		if (result != MA_SUCCESS) {
 			perror("Failed to play the list of musics");
+			free(args);
 			return result;
 		}
 		sendMessageToClient(fd_fromServer, NO_MESSAGE);
@@ -67,11 +68,14 @@ int cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs, i
 		result = getCurrentProgress(pSound, &progress);
 		if (result != MA_SUCCESS) {
 			perror("Failed to get current playing progress");
+			free(args);
 			return result;
 		}
 		ssize_t bytes_written = write(fd_fromServer, progress, 256 * sizeof(char));
 		if (bytes_written == -1) {
 			perror("Failed to write to named pipe");
+			free(args);
+			return MA_ERROR;
 		}
 		free(progress);
 	} else if (strcmp(args[0], "play-toggle") == 0) {
@@ -79,6 +83,7 @@ int cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs, i
 		result = playToggle(pSound);
 		if (result != MA_SUCCESS) {
 			perror("Failed to toggle the playing music");
+			free(args);
 			return result;
 		}
 		sendMessageToClient(fd_fromServer, NO_MESSAGE);
@@ -87,6 +92,7 @@ int cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs, i
 		result = moveCursor(pEngine, pSound, CURSOR_DIFF);
 		if (result != MA_SUCCESS) {
 			perror("Failed to move cursor forward");
+			free(args);
 			return result;
 		}
 		sendMessageToClient(fd_fromServer, NO_MESSAGE);
@@ -95,6 +101,7 @@ int cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs, i
 		result = moveCursor(pEngine, pSound, -CURSOR_DIFF);
 		if (result != MA_SUCCESS) {
 			perror("Failed to move cursor forward");
+			free(args);
 			return result;
 		}
 		sendMessageToClient(fd_fromServer, NO_MESSAGE);
@@ -102,17 +109,19 @@ int cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs, i
 		// usic set-cursor
 		if (numArgs < 2) {
 			perror("Not enough arguments");
+			free(args);
 			return MA_INVALID_ARGS;
 		}
 
 		result = setCursor(pEngine, pSound, args[1]);
 		if (result != MA_SUCCESS && result != MA_INVALID_ARGS) {
 			perror("Failed to set cursor");
+			free(args);
 			return result;
 		}
 		if (result == MA_INVALID_ARGS) {
 			sendMessageToClient(fd_fromServer, "Invalid time");
-			result = 0; // reset result to avoid server collapse
+			result = MA_SUCCESS; // reset result to avoid server collapse
 		} else{
 			// setCursor successfully
 			sendMessageToClient(fd_fromServer, NO_MESSAGE);
@@ -122,6 +131,7 @@ int cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs, i
 		result = adjustVolume(pEngine, VOLUME_DIFF);
 		if (result != MA_SUCCESS) {
 			perror("Failed to up volumen");
+			free(args);
 			return result;
 		}
 		sendMessageToClient(fd_fromServer, NO_MESSAGE);
@@ -130,6 +140,7 @@ int cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs, i
 		result = adjustVolume(pEngine, -VOLUME_DIFF);
 		if (result != MA_SUCCESS) {
 			perror("Failed to up volumen");
+			free(args);
 			return result;
 		}
 		sendMessageToClient(fd_fromServer, NO_MESSAGE);
@@ -139,6 +150,7 @@ int cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs, i
 		result = getVolume(pEngine, &volume);
 		if (result != MA_SUCCESS) {
 			perror("Failed to get volumen");
+			free(args);
 			return result;
 		}
 		sendMessageToClient(fd_fromServer, volume);
@@ -155,12 +167,18 @@ int cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs, i
 		result = muteToggle(pEngine);
 		if (result != MA_SUCCESS) {
 			perror("Failed to toggle mute");
+			free(args);
 			return result;
 		}
 		sendMessageToClient(fd_fromServer, NO_MESSAGE);
 	}
 	else {
 		char* message = (char*) malloc((strlen(args[0])+strlen("Unknown command")+1) * sizeof(char));
+		if (message == NULL) {
+			perror("Failed to allocate memory for message");
+			free(args);
+			return MA_OUT_OF_MEMORY;
+		}
 		message[0] = '\0';
 		strcat(message, "Unknown command: ");
 		strcat(message, args[0]);
@@ -169,7 +187,7 @@ int cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs, i
 		free(message);
 	}
 	free(args);
-	return result;
+	return MA_SUCCESS;
 }
 
 /*
@@ -211,8 +229,9 @@ ma_result playList(ma_engine* pEngine, ma_sound* pSound, char** args, int numArg
 		return MA_ERROR;
 	}
 	char music[512];
-	if (fgets(music, sizeof(music), fp) == NULL) {
+	if (fgets(music, sizeof(music), fp) == NULL || music == NULL) {
 		perror("Failed to read a music from the list file");
+		fclose(fp);
 		return MA_ERROR;
 	}
 	size_t newLinePos = strcspn(music, "\n");
@@ -222,22 +241,29 @@ ma_result playList(ma_engine* pEngine, ma_sound* pSound, char** args, int numArg
 	if (result != MA_SUCCESS) {
 		perror(music);
 		perror("Failed to initialize sound");
+		fclose(fp);
 		return result;
 	}
 	ma_sound_start(pSound);
+	fclose(fp);
 	return MA_SUCCESS;
 }
 
-int server(ma_engine* pEngine, ma_sound* pSound) {
-	int result = 0;
+ma_result server(ma_engine* pEngine, ma_sound* pSound) {
+	ma_result result;
 
 	char* toServer = (char*) malloc((strlen(RUNTIMEPATH) + strlen(PIPE_TO_SERVER) + 1) * sizeof(char));
+	if (toServer == NULL) {
+		perror("Failed to allocate memory for toServer");
+		return MA_OUT_OF_MEMORY;
+	}
 	setPipePath(PIPE_TO_SERVER, toServer);
 
 	// Initialize the toServer pipe
 	result = pipeInit(RUNTIMEPATH, toServer);
-	if (result == 1) {
+	if (result != MA_SUCCESS) {
 		perror("Failed to initialize to_server pipe");
+		free(toServer);
 		return result;
 	}
 	
@@ -245,16 +271,26 @@ int server(ma_engine* pEngine, ma_sound* pSound) {
 	int fd_toServer = open(toServer, O_RDONLY | O_NONBLOCK);
 	if (fd_toServer == -1) {
 		perror("Failed to open to_server pipe");
-		return 1;
+		free(toServer);
+		return MA_ERROR;
 	}
 
 	char* fromServer = (char*) malloc((strlen(RUNTIMEPATH) + strlen(PIPE_FROM_SERVER) + 1) * sizeof(char));
+	if (fromServer == NULL) {
+		perror("Failed to allocate memory for fromServer");
+		free(toServer);
+		close(fd_toServer);
+		return MA_OUT_OF_MEMORY;
+	}
 	setPipePath(PIPE_FROM_SERVER, fromServer);
 
 	// Initialize the fromServer pipe
 	result = pipeInit(RUNTIMEPATH, fromServer);
-	if (result == 1) {
+	if (result != MA_SUCCESS) {
 		perror("Failed to initialize from_server pipe");
+		free(toServer);
+		close(fd_toServer);
+		free(fromServer);
 		return result;
 	}
 	
@@ -262,18 +298,29 @@ int server(ma_engine* pEngine, ma_sound* pSound) {
 	int fd_fromServer = open(fromServer, O_WRONLY);
 	if (fd_fromServer == -1) {
 		perror("Failed to open from_server pipe");
-		return 1;
+		free(toServer);
+		close(fd_toServer);
+		free(fromServer);
+		return MA_ERROR;
 	}
 
 	result = ma_engine_init(NULL, pEngine);
 	if (result != MA_SUCCESS) {
 		perror("Failed to initialize engine");
+		free(toServer);
+		close(fd_toServer);
+		free(fromServer);
+		close(fd_fromServer);
 		return result;
 	}
 
 	result = ma_sound_init_from_data_source(pEngine, NULL, MA_SOUND_FLAG_NO_PITCH | MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC, NULL, pSound);
 	if (result != MA_SUCCESS) {
 		perror("Failed to initialize sound");
+		free(toServer);
+		close(fd_toServer);
+		free(fromServer);
+		close(fd_fromServer);
 		return result;
 	}
 
@@ -289,8 +336,12 @@ int server(ma_engine* pEngine, ma_sound* pSound) {
 			char** args = argsParser(buf, &numArgs);
 
 			result = cmdManager(pEngine, pSound, args, numArgs, fd_fromServer, &loopFlag);
-			if (result != 0) {
+			if (result != MA_SUCCESS) {
 				perror("Failed to manage command from client");
+				free(toServer);
+				close(fd_toServer);
+				free(fromServer);
+				close(fd_fromServer);
 				return result;
 			}
 		} else {
@@ -300,7 +351,11 @@ int server(ma_engine* pEngine, ma_sound* pSound) {
 						ma_sound_uninit(pSound);
 						result = ma_sound_init_from_file(pEngine, "/Users/ketch/Music/Music/Media.localized/Music/Unknown Artist/Unknown Album/赵雷-我记得.wav", MA_SOUND_FLAG_NO_PITCH | MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC, NULL, NULL, pSound);
 						if (result != MA_SUCCESS) {
-								return result;
+							free(toServer);
+							close(fd_toServer);
+							free(fromServer);
+							close(fd_fromServer);
+							return result;
 						}
 						ma_sound_start(pSound);
 					}
@@ -321,5 +376,5 @@ int server(ma_engine* pEngine, ma_sound* pSound) {
 	ma_engine_uninit(pEngine);
 	ma_sound_uninit(pSound);
 
-	return 0;
+	return MA_SUCCESS;
 }

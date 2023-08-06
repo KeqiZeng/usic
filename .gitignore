@@ -1,2 +1,4 @@
+.DS_Store
 /src/*.o
+/infer-out/*
 TODO.md

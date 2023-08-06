@@ -1,0 +1,4 @@
+{
+	"skip-analysis-in-path": [".+/src/miniaudio.c", ".+/src/miniaudio.h"],
+	"report-block-list-path-regex": [".+/src/miniaudio.c", ".+/src/miniaudio.h"]
+}

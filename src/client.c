@@ -39,6 +39,10 @@ int client(int argc, char* argv[]) {
 	// redirectStderr();
 	
 	char* toServer = (char*) malloc((strlen(RUNTIMEPATH) + strlen(PIPE_TO_SERVER) + 1) * sizeof(char));
+	if (toServer == NULL) {
+		perror("Failed to allocate memory for toServer");
+		return 1;
+	}
 	setPipePath(PIPE_TO_SERVER, toServer);
 	int fd_toServer = open(toServer, O_WRONLY);
 	if (fd_toServer == -1) {
@@ -47,16 +51,24 @@ int client(int argc, char* argv[]) {
 	}
 
 	char* fromServer = (char*) malloc((strlen(RUNTIMEPATH) + strlen(PIPE_FROM_SERVER) + 1) * sizeof(char));
+	if (fromServer == NULL) {
+		perror("Failed to allocate memory for fromServer");
+		close(fd_toServer);
+		return 1;
+	}
 	setPipePath(PIPE_FROM_SERVER, fromServer);
 	int fd_fromServer = open(fromServer, O_RDONLY);
 	if (fd_fromServer == -1) {
 		perror("Failed to open named pipe");
+		close(fd_toServer);
 		return 1;
 	}
 
 	char* concatenated_args = concatenateArgs(argc, argv);
 	if (concatenated_args == NULL) {
 		perror("Failed to concatenate arguments");
+		close(fd_toServer);
+		close(fd_fromServer);
 		return 1;
 	}
 
@@ -64,6 +76,8 @@ int client(int argc, char* argv[]) {
 	ssize_t bytes_written = write(fd_toServer, concatenated_args, strlen(concatenated_args));
 	if (bytes_written == -1) {
 		perror("Failed to write to named pipe");
+		close(fd_toServer);
+		close(fd_fromServer);
 		return 1;
 	}
 

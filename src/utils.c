@@ -14,7 +14,7 @@
  */
 static char* secondsToTimeStr(int seconds) {
 	if (seconds < 0) {
-		perror("Error: Input must be a non-negative integer");
+		perror("Error: the input of secondsToTimeStr function must be non-negative");
 		return NULL;
 	}
 
@@ -27,7 +27,7 @@ static char* secondsToTimeStr(int seconds) {
 	// Allocate memory for the result string
 	char *result = (char*) malloc(strLength * sizeof(char));
 	if (result == NULL) {
-		perror("Error: Memory allocation failed");
+		perror("Failed to allocate memory for result in secondsToTimeStr");
 		return NULL;
 	}
 	
@@ -92,6 +92,10 @@ int serverIsRunning() {
  */
 void redirectStderr() {
 	char* errorLog = (char*) malloc(strlen(RUNTIMEPATH) + 10);
+	if (errorLog == NULL) {
+		perror("Failed to allocate memory for errorLog");
+		return;
+	}
 	strcpy(errorLog, RUNTIMEPATH);
 	strcat(errorLog, "error.log");
 	strcat(errorLog, "\0");
@@ -247,6 +251,7 @@ char** argsParser(const char* str, int* numArgs) {
 		char* arg = args[i];
 
 		// Remove double quotes from the token, if present
+		// Note: The pointer arg is intentionally moved to remove the opening double quote.
 		if (arg[0] == '"' && arg[strlen(arg) - 1] == '"') {
 			arg[strlen(arg) - 1] = '\0'; // Remove the closing double quote
 			arg++; // Move the pointer one position ahead to remove the opening double quote
@@ -310,7 +315,15 @@ ma_result getCurrentProgress(ma_sound* pSound, char** progress) {
     length = round(length);
 
     char* cursor_str = secondsToTimeStr(cursor);
+		if (cursor_str == NULL) {
+			perror("Failed to convert the cursor to cursor_str");
+			return MA_ERROR;
+		}
     char* length_str = secondsToTimeStr(length);
+		if (length_str == NULL) {
+			perror("Failed to convert the length to length_str");
+			return MA_ERROR;
+		}
 
     // BAR_LENGTH should not be greater than 2^8 = 256
     ma_uint8 i = 0;
@@ -461,7 +474,10 @@ ma_result getVolume(ma_engine* pEngine, char** volume) {
 		return result;
 	}
 	*volume = (char*) malloc(15 * sizeof(char*));
-	// strcat(volume, )
+	if (*volume == NULL) {
+		perror("Failed to allocate memory for volume");
+		return MA_ERROR;
+	}
 	snprintf(*volume, 15, "Volume: %.1f%%", currentVolume * 100); // '%' need to escape in printf
 	return result;
 }
