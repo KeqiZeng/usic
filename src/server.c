@@ -229,7 +229,7 @@ ma_result playList(ma_engine* pEngine, ma_sound* pSound, char** args, int numArg
 		return MA_ERROR;
 	}
 	char music[512];
-	if (fgets(music, sizeof(music), fp) == NULL || music == NULL) {
+	if (fgets(music, sizeof(music), fp) == NULL) {
 		perror("Failed to read a music from the list file");
 		fclose(fp);
 		return MA_ERROR;
