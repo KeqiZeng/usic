@@ -7,6 +7,7 @@
 #include <math.h>
 
 #include "./config.h"
+#include "./server.h"
 #include "./utils.h"
 
 /*
@@ -516,4 +517,29 @@ ma_result next(ma_sound* pSound) {
 		perror("Failed to seek to the maximal pcm_frame");
 	}
   return result;
+}
+
+ma_result prev(ma_engine* pEngine, ma_sound* pSound, MusicNode* currentMusicNode, MusicList* defaultMusicList) {
+  ma_result result;
+  if (pSound->pDataSource != NULL) {
+    MusicNode* finishedMusicNode = createMusicNode(currentMusicNode->music);
+    if (finishedMusicNode == NULL) {
+      perror("prev: Failed to queue the current music");
+      return MA_ERROR;
+    }
+    headInsertMusic(defaultMusicList, finishedMusicNode);
+    MusicNode* prevMusicNode = popMusic(defaultMusicList);
+    if (prevMusicNode == NULL) {
+      perror("Failed to load next music");
+      return MA_ERROR;
+    }
+    result = play(pEngine, pSound, prevMusicNode->music, currentMusicNode);
+    if (result != MA_SUCCESS) {
+      perror("Failed to play the next music");
+      free(prevMusicNode);
+      return result;
+    }
+    free(prevMusicNode);
+  }
+  return MA_SUCCESS;
 }

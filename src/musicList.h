@@ -22,6 +22,7 @@ MusicNode* createMusicNode(char* music);
 void queueMusic(MusicList* musicList, MusicNode* music);
 MusicNode* dequeueMusic(MusicList* musicList);
 MusicNode* popMusic(MusicList* musicList);
+void headInsertMusic(MusicList* musicList, MusicNode* music);
 void printMusicList(MusicList* musicList);
 void freeMusicList(MusicList* musicList);
 void resetMusicList(MusicList* musicList);

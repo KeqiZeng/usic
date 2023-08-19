@@ -69,6 +69,19 @@ MusicNode* popMusic(MusicList* musicList) {
 	return result;
 }
 
+void headInsertMusic(MusicList* musicList, MusicNode* music) {
+	if (musicList->head == NULL && musicList->tail == NULL) {
+		musicList->head = music;
+		musicList->tail = music;
+		musicList->numMusics += 1;
+	} else {
+    music->next = musicList->head;
+    musicList->head->prev = music;
+    musicList->head = music;
+		musicList->numMusics += 1;
+  }
+}
+
 void printMusicList(MusicList* musicList) {
 	MusicNode* current = musicList->head;
 	while (current != NULL) {
