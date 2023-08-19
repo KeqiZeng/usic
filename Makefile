@@ -31,5 +31,7 @@ install : usic
 	install -m 755 usic /usr/local/bin
 
 with_script :
+	cp ./scripts/usic_play_list.sh /usr/local/bin/usic_play_list
 	cp ./scripts/usic_add_to_list.sh /usr/local/bin/usic_add_to_list
 	cp ./scripts/usic_create_default_playList.sh /usr/local/bin/usic_create_default_playList
+	cp ./scripts/usic_remove_from_list.sh /usr/local/bin/usic_remove_from_list

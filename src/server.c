@@ -30,7 +30,7 @@ static ma_result pipeInit(const char* pipeFolder, const char* pipePath) {
 }
 
 static void sendMessageToClient(int fd_fromServer, char* message) {
-	ssize_t bytes_written = write(fd_fromServer, message, 256 * sizeof(char));
+	ssize_t bytes_written = write(fd_fromServer, message, 512 * sizeof(char));
 	if (bytes_written == -1) {
 		perror("Failed to send message to client");
 	}
@@ -39,7 +39,9 @@ static void sendMessageToClient(int fd_fromServer, char* message) {
 /*
  * Manage the command from usic client
  */
-ma_result cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs, int fd_fromServer, bool* loopFlag) {
+ma_result cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs,
+                     int fd_fromServer, bool* loopFlag, MusicNode* currentMusicNode,
+                     MusicList* defaultMusicList, MusicList* laterPlayed) {
 	ma_result result;
 	if (strcmp(args[0], "quit") == 0) {
 		// usic quit
@@ -50,7 +52,17 @@ ma_result cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numA
 		if (numArgs < 2) {
 			sendMessageToClient(fd_fromServer, "Need an audio file to play");
 		} else {
-			result = play(pEngine, pSound, args[1]);
+			if (pSound->pDataSource != NULL) {
+        MusicNode* finishedMusicNode = createMusicNode(currentMusicNode->music);
+        if (finishedMusicNode == NULL) {
+          perror("Failed to change the music");
+          free(args);
+          return MA_ERROR;
+        }
+        queueMusic(defaultMusicList, finishedMusicNode);
+        // free(finishedMusicNode);
+      }
+			result = play(pEngine, pSound, args[1], currentMusicNode);
 			if (result != MA_SUCCESS) {
 				perror("Failed to play the music");
 				free(args);
@@ -60,13 +72,18 @@ ma_result cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numA
 			}
 		}
 	} else if (strcmp(args[0], "play-list") == 0){
-		result = playList(pEngine, pSound, args, numArgs);
-		if (result != MA_SUCCESS) {
-			perror("Failed to play the list of musics");
-			free(args);
-			return result;
+		if (numArgs < 2) {
+			sendMessageToClient(fd_fromServer, "Need a musicList file to play");
+		} else {
+			result = playList(pEngine, pSound, args, numArgs, currentMusicNode, defaultMusicList, laterPlayed);
+			if (result != MA_SUCCESS) {
+				perror("Failed to play the list of musics");
+				free(args);
+				return result;
+			} else {
+				sendMessageToClient(fd_fromServer, NO_MESSAGE);
+			}
 		}
-		sendMessageToClient(fd_fromServer, NO_MESSAGE);
 	} else if (strcmp(args[0], "progress") == 0) {
 		// usic progress
 		char* progress;
@@ -169,6 +186,14 @@ ma_result cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numA
 			return result;
 		}
 		sendMessageToClient(fd_fromServer, NO_MESSAGE);
+	} else if (strcmp(args[0], "next") == 0) {
+		result = next(pSound);
+		if (result != MA_SUCCESS) {
+			perror("Failed to jump to the next music");
+			free(args);
+			return result;
+		}
+		sendMessageToClient(fd_fromServer, NO_MESSAGE);
 	}
 	else {
 		char* message = (char*) malloc((strlen(args[0])+strlen("Unknown command")+1) * sizeof(char));
@@ -188,54 +213,115 @@ ma_result cmdManager(ma_engine* pEngine, ma_sound* pSound, char** args, int numA
 	return MA_SUCCESS;
 }
 
-/*
- * Play a music immediately
- */
-ma_result play(ma_engine* pEngine, ma_sound* pSound, char* music) {
+ma_result play(ma_engine* pEngine, ma_sound* pSound, char* music, MusicNode* currentMusicNode) {
 	ma_result result;
+	currentMusicNode->music = strdup(music);
 	ma_sound_uninit(pSound);
 	result = ma_sound_init_from_file(pEngine, music, MA_SOUND_FLAG_NO_PITCH | MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC, NULL, NULL, pSound);
 	if (result != MA_SUCCESS) {
-		perror("Failed to initialize sound");
+		perror("Failed to initialize the sound");
 		return result;
 	}
-	ma_sound_start(pSound);
+	result = ma_sound_start(pSound);
+	if (result != MA_SUCCESS) {
+		perror("Failed to play the sound");
+		return result;
+	}
 	return MA_SUCCESS;
 }
 
+// ma_result playNext(ma_engine* pEngine, ma_sound* pSound, ma_sound* pSoundNext, char* music, MusicNode* currentMusicNode) {
+// 	ma_result result;
+// 	currentMusicNode->music = strdup(music);
+// 	ma_sound_uninit(pSound);
+// 	result = ma_sound_init_copy(pEngine, pSoundNext, MA_SOUND_FLAG_NO_PITCH | MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC, NULL, pSound);
+// 	if (result != MA_SUCCESS) {
+// 		perror("Failed to copy pSoundNext to pSound");
+// 		return result;
+// 	}
+// 	result = ma_sound_start(pSound);
+// 	if (result != MA_SUCCESS) {
+// 		perror("Failed to play the music");
+// 		return result;
+// 	}
+// 	return MA_SUCCESS;
+// }
+
+// initialize nextMusicNode and pSoundNext
+MusicNode* loadNextMusic(MusicList* defaultMusicList, MusicList* laterPlayed) {
+	MusicNode* nextMusicNode = NULL;
+	if (laterPlayed->numMusics == 0) {
+    // load next music from defaultMusicList
+		nextMusicNode = dequeueMusic(defaultMusicList);
+		if (nextMusicNode == NULL) {
+			perror("Failed to get the next music from defaultMusicList");
+		}
+	} else {
+    // load next music from laterPlayed
+		nextMusicNode = dequeueMusic(laterPlayed);
+		if (nextMusicNode == NULL) {
+			perror("Failed to get the next music from laterPlayed musicList");
+		}
+	}
+  return nextMusicNode;
+}
+
 /*
- * Play a list of musics one by one TODO: need to rewrite
+ * Play a list of musics one by one, from a specific one
+ * play-list playList specificOne.
  */
-ma_result playList(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs) {
+ma_result playList(ma_engine* pEngine, ma_sound* pSound, char** args, int numArgs, MusicNode* currentMusicNode, MusicList* defaultMusicList, MusicList* laterPlayed) {
 	ma_result result;
 	if (numArgs < 2) {
 		perror("Not enough arguments");
 		return MA_INVALID_ARGS;
 	}
-	const char* musicList = args[1];
-	FILE* fp = fopen(musicList, "r");
+
+	// Load the playList to defaultMusicList
+	resetMusicList(defaultMusicList);
+	const char* playList = args[1];
+	FILE* fp = fopen(playList, "r");
 	if (fp == NULL) {
 		perror("Failed to open music list file");
 		return MA_ERROR;
 	}
-	char music[512];
-	if (fgets(music, sizeof(music), fp) == NULL) {
-		perror("Failed to read a music from the list file");
-		fclose(fp);
-		return MA_ERROR;
+
+	// check if the musicToPlay argument is given
+	char* musicToPlay = NULL;
+	if (numArgs > 2) {
+		musicToPlay = args[2];
 	}
-	size_t newLinePos = strcspn(music, "\n");
-	music[newLinePos] = '\0';
-	ma_sound_uninit(pSound);
-	result = ma_sound_init_from_file(pEngine, music, MA_SOUND_FLAG_NO_PITCH | MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC, NULL, NULL, pSound);
+	char music[512];
+	while (fgets(music, sizeof(music), fp)) {
+		size_t newLinePos = strcspn(music, "\n");
+		music[newLinePos] = '\0';
+		if (musicToPlay != NULL && strcmp(music, musicToPlay) == 0) {
+			continue;
+		} 
+		MusicNode* musicNode = createMusicNode(music);
+		if (musicNode == NULL) {
+			perror("Failed to allocate memory for MusicNode while initializing the defaultMusicList");
+			fclose(fp);
+			return MA_OUT_OF_MEMORY;
+		}
+		queueMusic(defaultMusicList, musicNode);
+	}
+
+	fclose(fp);
+	if (musicToPlay == NULL) {
+    MusicNode* musicToPlayNode = dequeueMusic(defaultMusicList);
+		if (musicToPlayNode == NULL) {
+			perror("Failed to dequeue a music from the defaultMusicList");
+			return MA_ERROR;
+		}
+		musicToPlay = musicToPlayNode->music;
+		free(musicToPlayNode);
+	}
+	result = play(pEngine, pSound, musicToPlay, currentMusicNode);
 	if (result != MA_SUCCESS) {
-		perror(music);
-		perror("Failed to initialize sound");
-		fclose(fp);
+		perror("Failed to play the music");
 		return result;
 	}
-	ma_sound_start(pSound);
-	fclose(fp);
 	return MA_SUCCESS;
 }
 
@@ -257,11 +343,12 @@ ma_result server(ma_engine* pEngine, ma_sound* pSound) {
 		return result;
 	}
 	
-	// Open the toServer as O_NONBLOCK
+	// Open the toServer pipe as O_NONBLOCK
 	int fd_toServer = open(toServer, O_RDONLY | O_NONBLOCK);
 	if (fd_toServer == -1) {
 		perror("Failed to open to_server pipe");
 		free(toServer);
+		unlink(toServer);
 		return MA_ERROR;
 	}
 
@@ -269,6 +356,7 @@ ma_result server(ma_engine* pEngine, ma_sound* pSound) {
 	if (fromServer == NULL) {
 		perror("Failed to allocate memory for fromServer");
 		free(toServer);
+		unlink(toServer);
 		close(fd_toServer);
 		return MA_OUT_OF_MEMORY;
 	}
@@ -279,6 +367,7 @@ ma_result server(ma_engine* pEngine, ma_sound* pSound) {
 	if (result != MA_SUCCESS) {
 		perror("Failed to initialize from_server pipe");
 		free(toServer);
+		unlink(toServer);
 		close(fd_toServer);
 		free(fromServer);
 		return result;
@@ -289,35 +378,95 @@ ma_result server(ma_engine* pEngine, ma_sound* pSound) {
 	if (fd_fromServer == -1) {
 		perror("Failed to open from_server pipe");
 		free(toServer);
+		unlink(toServer);
 		close(fd_toServer);
 		free(fromServer);
+		unlink(fromServer);
 		return MA_ERROR;
 	}
 
+	// Initialize ma_engine
 	result = ma_engine_init(NULL, pEngine);
 	if (result != MA_SUCCESS) {
 		perror("Failed to initialize engine");
 		free(toServer);
+		unlink(toServer);
 		close(fd_toServer);
 		free(fromServer);
+		unlink(fromServer);
 		close(fd_fromServer);
 		return result;
 	}
 
+	// Initialize a blank ma_sound
 	result = ma_sound_init_from_data_source(pEngine, NULL, MA_SOUND_FLAG_NO_PITCH | MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC, NULL, pSound);
 	if (result != MA_SUCCESS) {
-		perror("Failed to initialize sound");
+		perror("Failed to initialize initial sound");
 		free(toServer);
+		unlink(toServer);
 		close(fd_toServer);
 		free(fromServer);
+		unlink(fromServer);
 		close(fd_fromServer);
+		ma_engine_uninit(pEngine);
 		return result;
 	}
 
-	char buf[256];
+	// Initialize a default musicList
+	MusicList* defaultMusicList = createMusicList();
+	if (defaultMusicList == NULL) {
+		perror("Failed to allocate memory for defaultMusicList");
+		free(toServer);
+		unlink(toServer);
+		close(fd_toServer);
+		free(fromServer);
+		unlink(fromServer);
+		close(fd_fromServer);
+		ma_engine_uninit(pEngine);
+		ma_sound_uninit(pSound);
+		return MA_OUT_OF_MEMORY;
+	}
+
+	// Initialize a laterPlayed musicList
+	MusicList* laterPlayed = createMusicList();
+	if (laterPlayed == NULL) {
+		perror("Failed to allocate memory for laterPlayed musicList");
+		free(toServer);
+		unlink(toServer);
+		close(fd_toServer);
+		free(fromServer);
+		unlink(fromServer);
+		close(fd_fromServer);
+		ma_engine_uninit(pEngine);
+		ma_sound_uninit(pSound);
+		freeMusicList(defaultMusicList);
+		return MA_OUT_OF_MEMORY;
+	}
+
+	// Initialize a musicNode for the current played music
+	MusicNode* currentMusicNode = createMusicNode("\0");
+	if (currentMusicNode == NULL) {
+		perror("Failed to allocate memory for current played music");
+		free(toServer);
+		unlink(toServer);
+		close(fd_toServer);
+		free(fromServer);
+		unlink(fromServer);
+		close(fd_fromServer);
+		ma_engine_uninit(pEngine);
+		ma_sound_uninit(pSound);
+		freeMusicList(defaultMusicList);
+		freeMusicList(laterPlayed);
+		free(currentMusicNode);
+		return MA_OUT_OF_MEMORY;
+	}
+
+	char buf[512];
 	ssize_t bytes_readed = 0;
 	bool loopFlag = true;
+	MusicNode* finishedMusicNode = NULL;
 	while (loopFlag) {
+    // get command from client
 		bytes_readed = read(fd_toServer, buf, sizeof(buf));
 		if (bytes_readed > 0) {
 			buf[bytes_readed] = '\0';
@@ -325,46 +474,123 @@ ma_result server(ma_engine* pEngine, ma_sound* pSound) {
 			int numArgs = 0;
 			char** args = argsParser(buf, &numArgs);
 
-			result = cmdManager(pEngine, pSound, args, numArgs, fd_fromServer, &loopFlag);
+			result = cmdManager(pEngine, pSound, args, numArgs, fd_fromServer, &loopFlag, currentMusicNode, defaultMusicList, laterPlayed);
 			if (result != MA_SUCCESS) {
 				perror("Failed to manage command from client");
 				free(toServer);
+				unlink(toServer);
 				close(fd_toServer);
 				free(fromServer);
+				unlink(fromServer);
 				close(fd_fromServer);
+				ma_engine_uninit(pEngine);
+				ma_sound_uninit(pSound);
+				freeMusicList(defaultMusicList);
+				freeMusicList(laterPlayed);
+				free(currentMusicNode);
 				return result;
 			}
 		} else {
 			if (pSound->pDataSource != NULL) {
-				if ((bool)ma_sound_is_playing(pSound)) {
-					if ((bool)ma_sound_at_end(pSound)) {
+				if ((bool)ma_sound_at_end(pSound)) {
+					finishedMusicNode = createMusicNode(currentMusicNode->music);
+					if (finishedMusicNode == NULL) {
+						perror("Failed to allocate memory for finishedMusicNode");
+						free(toServer);
+						unlink(toServer);
+						close(fd_toServer);
+						free(fromServer);
+						unlink(fromServer);
+						close(fd_fromServer);
+						ma_engine_uninit(pEngine);
 						ma_sound_uninit(pSound);
-						result = ma_sound_init_from_file(pEngine, "/Users/ketch/Music/Music/Media.localized/Music/Unknown Artist/Unknown Album/赵雷-我记得.wav", MA_SOUND_FLAG_NO_PITCH | MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC, NULL, NULL, pSound);
-						if (result != MA_SUCCESS) {
-							free(toServer);
-							close(fd_toServer);
-							free(fromServer);
-							close(fd_fromServer);
-							return result;
-						}
-						ma_sound_start(pSound);
+						freeMusicList(defaultMusicList);
+						freeMusicList(laterPlayed);
+						free(currentMusicNode);
+						return MA_OUT_OF_MEMORY;
 					}
+					printf("finishedMusic: %s\n", finishedMusicNode->music);
+					queueMusic(defaultMusicList, finishedMusicNode);
+					// printMusicList(defaultMusicList);
+					MusicNode* nextMusicNode = loadNextMusic(defaultMusicList, laterPlayed);
+          if (nextMusicNode == NULL) {
+            perror("Failed to load next music");
+						free(toServer);
+						unlink(toServer);
+						close(fd_toServer);
+						free(fromServer);
+						unlink(fromServer);
+						close(fd_fromServer);
+						ma_engine_uninit(pEngine);
+						ma_sound_uninit(pSound);
+						freeMusicList(defaultMusicList);
+						freeMusicList(laterPlayed);
+						free(currentMusicNode);
+            return MA_ERROR;
+          }
+					printf("nextMusic %s\n", nextMusicNode->music);
+					result = play(pEngine, pSound, nextMusicNode->music, currentMusicNode);
+					if (result != MA_SUCCESS) {
+						perror("Failed to play the next music");
+						free(toServer);
+						unlink(toServer);
+						close(fd_toServer);
+						free(fromServer);
+						unlink(fromServer);
+						close(fd_fromServer);
+						ma_engine_uninit(pEngine);
+						ma_sound_uninit(pSound);
+						freeMusicList(defaultMusicList);
+						freeMusicList(laterPlayed);
+						free(currentMusicNode);
+						free(finishedMusicNode);
+            free(nextMusicNode);
+						return result;
+					}
+          free(nextMusicNode);
 				}
+        // else {
+					// if (loadNext) {
+					// 	ma_sound_uninit(pSoundNext);
+					// 	nextMusicNode = loadNextMusic(defaultMusicList, laterPlayed);
+					// 	if (result != MA_SUCCESS) {
+					// 		perror("Failed to load the next music");
+					// 		free(toServer);
+					// 		unlink(toServer);
+					// 		close(fd_toServer);
+					// 		free(fromServer);
+					// 		unlink(fromServer);
+					// 		close(fd_fromServer);
+					// 		ma_engine_uninit(pEngine);
+					// 		ma_sound_uninit(pSound);
+					// 		ma_sound_uninit(pSoundNext);
+					// 		free(pSoundNext);
+					// 		freeMusicList(defaultMusicList);
+					// 		freeMusicList(laterPlayed);
+					// 		free(currentMusicNode);
+					// 		if (finishedMusicNode != NULL) {
+					// 			free(finishedMusicNode);
+					// 		}
+					// 		return result;
+					// 	}
+					// 	loadNext = false;
+					// }
+				// }
 			}
 		}
 	}
 
-	close(fd_toServer);
-	close(fd_fromServer);
-
-	unlink(toServer);
-	unlink(fromServer);
-
 	free(toServer);
+	unlink(toServer);
+	close(fd_toServer);
 	free(fromServer);
-
+	unlink(fromServer);
+	close(fd_fromServer);
 	ma_engine_uninit(pEngine);
 	ma_sound_uninit(pSound);
-
-	return MA_SUCCESS;
+	freeMusicList(defaultMusicList);
+	freeMusicList(laterPlayed);
+	free(currentMusicNode);
+	free(finishedMusicNode);
+	return result;
 }

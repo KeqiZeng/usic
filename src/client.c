@@ -81,7 +81,7 @@ int client(int argc, char* argv[]) {
 		return 1;
 	}
 
-	char buf[256];
+	char buf[512];
 	ssize_t bytes_readed = read(fd_fromServer, buf, sizeof(buf));
 	if (bytes_readed > 0 && strcmp(buf, NO_MESSAGE) != 0) {
 		printf("%s\n", buf);

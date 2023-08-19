@@ -16,5 +16,6 @@ ma_result setCursor(ma_engine* pEngine, ma_sound* pSound, const char* time);
 ma_result adjustVolume(ma_engine* pEngine, float diff);
 ma_result getVolume(ma_engine* pEngine, char** volume);
 ma_result muteToggle(ma_engine* pEngine);
+ma_result next(ma_sound* pSound);
 
 #endif // !USIC_UTILS_H

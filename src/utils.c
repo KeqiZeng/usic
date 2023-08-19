@@ -130,8 +130,8 @@ void setupRuntime() {
 		}
 	}
 
-	fclose(stdin);
-	fclose(stdout);
+	// fclose(stdin);
+	// fclose(stdout);
 	
 	redirectStderr();
 }
@@ -286,7 +286,7 @@ ma_result playToggle(ma_sound* pSound) {
 /*
  * Plot the current progress with bar and time, like:
  *
- * ----------------------o-------------------------- current/length
+ * ++++++++++++++++++++++o-------------------------- current/length
  *      ^                ^            ^
  *	has_been_played     now     will_be_played
  *
@@ -340,7 +340,7 @@ ma_result getCurrentProgress(ma_sound* pSound, char** progress) {
     float percent = cursor / length;
     int n_played = (int)(percent * 100) / (int)(100 / BAR_LENGTH);
     for (i = 0; i < n_played; ++i) {
-        (*progress)[i] = '-';
+        (*progress)[i] = '+';
     }
 
     // set the current cursor in the bar
@@ -502,4 +502,18 @@ ma_result muteToggle(ma_engine* pEngine) {
 		}
 	}
 	return MA_SUCCESS;
+}
+
+ma_result next(ma_sound* pSound) {
+	ma_result result;
+	ma_uint64 length = 0;
+	result = ma_sound_get_length_in_pcm_frames(pSound, &length);
+	if (result != MA_SUCCESS) {
+		perror("Failed to get the length in pcm in function next");
+	}
+	result = ma_sound_seek_to_pcm_frame(pSound, length);
+	if (result != MA_SUCCESS) {
+		perror("Failed to seek to the maximal pcm_frame");
+	}
+  return result;
 }
