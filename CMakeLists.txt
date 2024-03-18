@@ -11,7 +11,7 @@ endif()
 
 project(usic)
 include_directories(include)
-set(SOURCES src/main.cpp src/commands.cpp src/utils.cpp src/runtime.cpp)
+set(SOURCES src/main.cpp src/commands.cpp src/callback.cpp src/runtime.cpp)
 add_executable(${PROJECT_NAME} ${SOURCES})
 
 include(FetchContent)

@@ -5,6 +5,7 @@
 #include <string>
 #include <utility>
 
+#include "components.hpp"
 #include "constants.hpp"
 #include "fmt/core.h"
 #include "runtime.hpp"
@@ -53,69 +54,46 @@ static auto sec_to_timeStr(int seconds) -> std::string {
   return fmt::format("{:d}:{:02d}", min, sec);
 }
 
-// auto play(ma_engine* pEngine, MaSound* pSound_to_play,
-//           const std::string& musicToPlay, std::string* musicPlaying,
-//           MusicList* musicList, MaSound* pSound_to_register,
-//           bool shuffle) -> ma_result {
-auto play(ma_engine* pEngine, ma_sound* pSound_to_play,
+auto play(ma_engine* pEngine, SoundPack* pSound_to_play,
           const std::string& musicToPlay, std::string* musicPlaying,
-          MusicList* musicList, ma_sound* pSound_to_register,
+          MusicList* musicList, SoundPack* pSound_to_register,
           bool shuffle) -> ma_result {
-  ma_sound_stop(pSound_to_register);
-  ma_sound_uninit(pSound_to_play);
-
   *musicPlaying = musicToPlay;
 
-  // pSound_to_register->uninit();
-  // pSound_to_play->uninit();
-  // ma_result result = pSound_to_play->init(pEngine, musicToPlay,
-  // LOADING_FLAGS);
-  ma_result result =
-      ma_sound_init_from_file(pEngine, musicToPlay.c_str(), LOADING_FLAGS,
+  pSound_to_register->isPlaying = false;
 
-                              nullptr, nullptr, pSound_to_play);
+  pSound_to_play->uninit();
+  ma_result result = pSound_to_play->init(pEngine, musicToPlay, LOADING_FLAGS);
   if (result != MA_SUCCESS) {
     error_log(
         fmt::format("Failed to initialize sound from file: {}", musicToPlay));
     return result;
   }
 
-  auto* pUserData(new UserData(pEngine, pSound_to_register, musicList,
-                               musicPlaying, shuffle));
+  auto* pUserData(new UserData(pEngine, pSound_to_register, pSound_to_play,
+                               musicList, musicPlaying, shuffle));
 
-  ma_sound_set_end_callback(pSound_to_play, sound_at_end_callback, pUserData);
-  result = ma_sound_start(pSound_to_play);
+  ma_sound_set_end_callback(pSound_to_play->pSound.get(), sound_at_end_callback,
+                            pUserData);
+  result = ma_sound_start(pSound_to_play->pSound.get());
   if (result != MA_SUCCESS) {
     // TODO: log
     error_log(fmt::format("Failed to start sound: {}", musicToPlay));
     return result;
   }
+  pSound_to_play->isPlaying = true;
+  fmt::print("{} started\n", musicToPlay);
   return MA_SUCCESS;
 }
 
 auto play_prev(MaComponents* pMa, std::string* musicPlaying,
                MusicList* musicList, bool shuffle) -> ma_result {
-  ma_sound_uninit(pMa->pSound_to_play.get());
-  ma_sound_uninit(pMa->pSound_to_register.get());
-  ma_result result =
-      ma_sound_mock_init(pMa->pEngine.get(), pMa->pSound_to_play.get());
-  if (result != MA_SUCCESS) {
-    // TODO: log
-    error_log("Failed to mockingly initialize sound_to_play");
-    return result;
-  }
-
-  result =
-      ma_sound_mock_init(pMa->pEngine.get(), pMa->pSound_to_register.get());
-  if (result != MA_SUCCESS) {
-    // TODO: log
-    error_log("Failed to mockingly initialize sound_to_register");
-    return result;
-  }
+  pMa->pSound_to_play->uninit();
+  pMa->pSound_to_register->uninit();
 
   musicList->head_in(*musicPlaying);
   const std::string& musicToPlay = musicList->tail_out()->get_music();
-  result =
+  ma_result result =
       play(pMa->pEngine.get(), pMa->pSound_to_play.get(), musicToPlay,
            musicPlaying, musicList, pMa->pSound_to_register.get(), shuffle);
   if (result != MA_SUCCESS) {
@@ -134,26 +112,37 @@ auto play_later(const std::string& music, MusicList* musicList) -> void {
   musicList->head_in(music);
 }
 
-static auto is_playing(ma_sound* pSound) -> bool {
-  return !ma_sound_at_end(pSound) && pSound->ownsDataSource;
-}
+// static auto is_playing(ma_sound* pSound) -> bool {
+//   return !ma_sound_at_end(pSound) && pSound->ownsDataSource;
+// }
 
-static auto get_playing_sound(MaComponents* pMa) -> ma_sound* {
+static auto get_playing_pSound(MaComponents* pMa) -> ma_sound* {
   ma_sound* pSound = nullptr;
-  if (is_playing(pMa->pSound_to_play.get()) &&
-      !is_playing(pMa->pSound_to_register.get())) {
-    pSound = pMa->pSound_to_play.get();
-  } else if (!is_playing(pMa->pSound_to_play.get()) &&
-             is_playing(pMa->pSound_to_register.get())) {
-    pSound = pMa->pSound_to_register.get();
+  if (pMa->pSound_to_play && !pMa->pSound_to_register) {
+    if (pMa->pSound_to_play->is_playing()) {
+      pSound = pMa->pSound_to_play->pSound.get();
+    }
+  } else if (!pMa->pSound_to_play && pMa->pSound_to_register) {
+    if (pMa->pSound_to_register->is_playing()) {
+      pSound = pMa->pSound_to_register->pSound.get();
+    }
+  } else if (pMa->pSound_to_play && pMa->pSound_to_register) {
+    if (pMa->pSound_to_play->is_playing() &&
+        !pMa->pSound_to_register->is_playing()) {
+      pSound = pMa->pSound_to_play->pSound.get();
+    } else if (!pMa->pSound_to_play->is_playing() &&
+               pMa->pSound_to_register->is_playing()) {
+      pSound = pMa->pSound_to_register->pSound.get();
+    }
   }
   return pSound;
 }
 
 auto play_next(MaComponents* pMa) -> ma_result {
-  ma_sound* pSound = get_playing_sound(pMa);
+  ma_sound* pSound = get_playing_pSound(pMa);
   if (pSound == nullptr) {
     // TODO: log
+    error_log("Failed to get playing pSound");
     return MA_ERROR;
   }
 
@@ -172,7 +161,7 @@ auto play_next(MaComponents* pMa) -> ma_result {
 }
 
 auto pause_resume(MaComponents* pMa) -> ma_result {
-  ma_sound* pSound = get_playing_sound(pMa);
+  ma_sound* pSound = get_playing_pSound(pMa);
   if (pSound == nullptr) {
     // TODO: log
     return MA_ERROR;
@@ -198,7 +187,7 @@ auto pause_resume(MaComponents* pMa) -> ma_result {
 }
 
 auto move_cursor(MaComponents* pMa, int seconds) -> ma_result {
-  ma_sound* pSound = get_playing_sound(pMa);
+  ma_sound* pSound = get_playing_pSound(pMa);
   if (pSound == nullptr) {
     // TODO: log
     return MA_ERROR;
@@ -241,7 +230,7 @@ auto move_cursor(MaComponents* pMa, int seconds) -> ma_result {
 }
 
 auto set_cursor(MaComponents* pMa, const std::string& time) -> ma_result {
-  ma_sound* pSound = get_playing_sound(pMa);
+  ma_sound* pSound = get_playing_pSound(pMa);
   if (pSound == nullptr) {
     // TODO: log
     return MA_ERROR;
@@ -279,7 +268,7 @@ auto set_cursor(MaComponents* pMa, const std::string& time) -> ma_result {
 
 auto get_current_progress(MaComponents* pMa,
                           Progress* currentProgress) -> ma_result {
-  ma_sound* pSound = get_playing_sound(pMa);
+  ma_sound* pSound = get_playing_pSound(pMa);
   if (pSound == nullptr) {
     // TODO: log
     return MA_ERROR;

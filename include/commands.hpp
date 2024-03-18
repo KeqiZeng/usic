@@ -2,17 +2,16 @@
 
 #include "miniaudio.h"
 #include "music_list.hpp"
-#include "utils.hpp"
 
-struct Progress {
-  std::string str;
-  float percent;
-};
+struct SoundInitNotification;
+class SoundPack;
+class MaComponents;
+struct Progress;
 
-auto play(ma_engine* pEngine, ma_sound* pSound_to_play,
+auto play(ma_engine* pEngine, SoundPack* pSound_to_play,
           const std::string& musicToPlay, std::string* musicPlaying,
-          MusicList* musicList, ma_sound* pSound_to_register,
-          bool shuffle = false) -> ma_result;
+          MusicList* musicList, SoundPack* pSound_to_register,
+          bool shuffle) -> ma_result;
 auto play_prev(MaComponents* pMa, std::string* musicPlaying,
                MusicList* musicList, bool shuffle = false) -> ma_result;
 
