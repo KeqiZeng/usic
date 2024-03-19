@@ -17,6 +17,7 @@ struct SoundInitNotification {
 class SoundPack {
   friend void sound_init_notification_callback(
       ma_async_notification* pNotification);
+  // friend void sound_at_end_callback(void* pUserData, ma_sound* pSound);
   friend auto play(ma_engine* pEngine, SoundPack* pSound_to_play,
                    const std::string& musicToPlay, std::string* musicPlaying,
                    MusicList* musicList, SoundPack* pSound_to_register,
@@ -62,6 +63,7 @@ class SoundPack {
     if (this->isInitialized && this->pSound) {
       ma_sound_uninit(this->pSound.get());
       this->isInitialized = false;
+      this->isPlaying = false;
       fmt::print("uninit sound\n");
     }
   }

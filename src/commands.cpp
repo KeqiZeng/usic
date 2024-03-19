@@ -70,6 +70,15 @@ auto play(ma_engine* pEngine, SoundPack* pSound_to_play,
     return result;
   }
 
+  if (shuffle) {
+    auto music = musicList->random_out();
+    if (!music) {
+      error_log(fmt::format("Failed to get random music: {}", musicToPlay));
+      return MA_ERROR;
+    }
+    musicList->head_in(music->get_music());
+  }
+
   auto* pUserData(new UserData(pEngine, pSound_to_register, pSound_to_play,
                                musicList, musicPlaying, shuffle));
 
@@ -86,38 +95,23 @@ auto play(ma_engine* pEngine, SoundPack* pSound_to_play,
   return MA_SUCCESS;
 }
 
-auto play_prev(MaComponents* pMa, std::string* musicPlaying,
-               MusicList* musicList, bool shuffle) -> ma_result {
-  pMa->pSound_to_play->uninit();
-  pMa->pSound_to_register->uninit();
-
-  musicList->head_in(*musicPlaying);
-  const std::string& musicToPlay = musicList->tail_out()->get_music();
-  ma_result result =
-      play(pMa->pEngine.get(), pMa->pSound_to_play.get(), musicToPlay,
-           musicPlaying, musicList, pMa->pSound_to_register.get(), shuffle);
-  if (result != MA_SUCCESS) {
-    // TODO: log
-    error_log(fmt::format("Failed to play music: {}", musicToPlay));
-    return result;
-  }
-
-  return MA_SUCCESS;
-}
-
 auto play_later(const std::string& music, MusicList* musicList) -> void {
+  if (!musicList) {
+    error_log("Invalid musicList in play_later");
+    return;
+  }
   if (musicList->contain(music)) {
     musicList->remove(music);
   }
   musicList->head_in(music);
 }
 
-// static auto is_playing(ma_sound* pSound) -> bool {
-//   return !ma_sound_at_end(pSound) && pSound->ownsDataSource;
-// }
-
 static auto get_playing_pSound(MaComponents* pMa) -> ma_sound* {
   ma_sound* pSound = nullptr;
+  if (!pMa) {
+    error_log("Invalid pMa in get_playing_pSound");
+    return pSound;
+  }
   if (pMa->pSound_to_play && !pMa->pSound_to_register) {
     if (pMa->pSound_to_play->is_playing()) {
       pSound = pMa->pSound_to_play->pSound.get();
@@ -149,15 +143,29 @@ auto play_next(MaComponents* pMa) -> ma_result {
   ma_uint64 length = 0;
   ma_result result = ma_sound_get_length_in_pcm_frames(pSound, &length);
   if (result != MA_SUCCESS) {
-    // TODO: log
+    error_log("Failed to get length in pcm frames");
     return result;
   }
   result = ma_sound_seek_to_pcm_frame(pSound, length);
   if (result != MA_SUCCESS) {
-    // TODO: log
+    error_log("Failed to seek to pcm frame");
     return result;
   }
   return MA_SUCCESS;
+}
+
+auto play_prev(MaComponents* pMa, MusicList* musicList) -> ma_result {
+  if (!musicList || musicList->is_empty()) {
+    error_log("Invalid musicList in play_prev");
+    return MA_ERROR;
+  }
+  auto prevMusic = musicList->tail_out();
+  if (prevMusic == nullptr) {
+    error_log("Failed to get prev music");
+    return MA_ERROR;
+  }
+  musicList->head_in(prevMusic->get_music());
+  return play_next(pMa);
 }
 
 auto pause_resume(MaComponents* pMa) -> ma_result {
