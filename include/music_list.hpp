@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "config.hpp"
+#include "constants.hpp"
 #include "fmt/core.h"
 #include "runtime.hpp"
 
@@ -38,11 +40,12 @@ class MusicList {
 
  public:
   MusicList() = default;
-  MusicList(const std::string& listFile) {
+  MusicList(Config* config, const std::string& listFile) {
     std::ifstream file(listFile.c_str());
     if (file.is_open()) {
       std::string line;
       while (std::getline(file, line)) {
+        line = fmt::format("{}{}", config->get_usic_library(), line);
         this->tail_in(line);
       }
       file.close();
@@ -194,7 +197,7 @@ class MusicList {
     return false;
   }
 
-  auto remove(const std::string& music) -> void {
+  auto remove(const std::string& music) -> bool {
     auto current = this->head;
     while (current) {
       if (current->get_music() == music) {
@@ -218,10 +221,11 @@ class MusicList {
         }
         current.reset();
         this->count -= 1;
-      } else {
-        current = current->next;
+        return true;
       }
+      current = current->next;
     }
+    return false;
   }
 
   auto clear() -> void {

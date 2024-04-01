@@ -1,9 +1,11 @@
 #pragma once
+#include <condition_variable>
 #include <memory>
+#include <mutex>
 #include <string>
 
 #include "callback.hpp"
-#include "commands.hpp"
+#include "core.hpp"
 #include "miniaudio.h"
 #include "music_list.hpp"
 
@@ -18,14 +20,17 @@ class SoundPack {
   friend void sound_init_notification_callback(
       ma_async_notification* pNotification);
   // friend void sound_at_end_callback(void* pUserData, ma_sound* pSound);
-  friend auto play(ma_engine* pEngine, SoundPack* pSound_to_play,
-                   const std::string& musicToPlay, std::string* musicPlaying,
-                   MusicList* musicList, SoundPack* pSound_to_register,
-                   bool shuffle) -> ma_result;
+  friend auto play_internal(ma_engine* pEngine, SoundPack* pSound_to_play,
+                            const std::string& musicToPlay,
+                            std::string* musicPlaying, MusicList* musicList,
+                            SoundPack* pSound_to_register,
+                            SoundFinished* soundFinished,
+                            bool shuffle) -> ma_result;
 
  private:
   bool isInitialized{false};
   bool isPlaying{false};
+  std::mutex mtx;
   std::unique_ptr<SoundInitNotification> soundInitNotification{nullptr};
 
  public:
@@ -38,6 +43,7 @@ class SoundPack {
 
   auto init(ma_engine* pEngine, const std::string& pFilePath,
             ma_uint32 flags) -> ma_result {
+    std::lock_guard<std::mutex> lock(this->mtx);
     if (this->isInitialized) {
       error_log("Can not init sound twice");
       return MA_ERROR;
@@ -51,16 +57,12 @@ class SoundPack {
     config.initNotifications.done.pNotification =
         this->soundInitNotification.get();
 
-    ma_result result = ma_sound_init_ex(pEngine, &config, this->pSound.get());
-    if (result != MA_SUCCESS) {
-      error_log(
-          fmt::format("Failed to initialize sound from file: {}", pFilePath));
-    }
-    return result;
+    return ma_sound_init_ex(pEngine, &config, this->pSound.get());
   }
 
   auto uninit() -> void {
     if (this->isInitialized && this->pSound) {
+      std::lock_guard<std::mutex> lock(this->mtx);
       ma_sound_uninit(this->pSound.get());
       this->isInitialized = false;
       this->isPlaying = false;
@@ -72,21 +74,46 @@ class SoundPack {
   auto is_playing() -> bool { return this->isPlaying; }
 };
 
+class SoundFinished {
+  friend auto cleanFunc(MaComponents* pMa,
+                        SoundFinished* soundFinished) -> void;
+  std::mutex mtx;
+  std::condition_variable cv;
+  bool finished{false};
+  bool quitFlag{false};
+
+ public:
+  auto signal() -> void {
+    std::lock_guard<std::mutex> lock(this->mtx);
+    this->finished = true;
+    this->cv.notify_one();
+  }
+
+  auto reset() -> void { this->finished = false; }
+  auto quit() -> void {
+    std::lock_guard<std::mutex> lock(this->mtx);
+    this->quitFlag = true;
+    this->cv.notify_one();
+  }
+};
+
 class UserData {
  public:
   ma_engine* pEngine;
   SoundPack* pSound_to_play;
   SoundPack* pSound_to_register;
+  SoundFinished* soundFinished;
   MusicList* musicList;
   std::string* musicPlaying;
   bool shuffle;
 
   UserData(ma_engine* _pEngine, SoundPack* _pSound_to_play,
-           SoundPack* _pSound_to_register, MusicList* _musicList,
-           std::string* _musicPlaying, bool _shuffle)
+           SoundPack* _pSound_to_register, SoundFinished* _soundFinished,
+           MusicList* _musicList, std::string* _musicPlaying, bool _shuffle)
       : pEngine(_pEngine),
         pSound_to_play(_pSound_to_play),
         pSound_to_register(_pSound_to_register),
+        soundFinished(_soundFinished),
         musicList(_musicList),
         musicPlaying(_musicPlaying),
         shuffle(_shuffle) {}

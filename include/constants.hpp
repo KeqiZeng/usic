@@ -7,8 +7,8 @@
   MA_SOUND_FLAG_NO_PITCH | MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC
 
 const int FATAL_ERROR = -1;
-const std::string logPath =
+const std::string LOGPATH =
     fmt::format("{}/{}", std::getenv("HOME"), ".local/state/usic");
-const std::string logFile =
+const std::string LOGFILE =
     fmt::format("{}/{}", std::getenv("HOME"), ".local/state/usic/error.log");
 const int SECONDS_PER_MINUTE = 60;

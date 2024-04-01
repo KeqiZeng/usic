@@ -5,7 +5,6 @@
 #include <string>
 #include <utility>
 
-#include "components.hpp"
 #include "constants.hpp"
 #include "fmt/core.h"
 #include "runtime.hpp"
@@ -54,82 +53,65 @@ static auto sec_to_timeStr(int seconds) -> std::string {
   return fmt::format("{:d}:{:02d}", min, sec);
 }
 
-auto play(ma_engine* pEngine, SoundPack* pSound_to_play,
-          const std::string& musicToPlay, std::string* musicPlaying,
-          MusicList* musicList, SoundPack* pSound_to_register,
-          bool shuffle) -> ma_result {
-  *musicPlaying = musicToPlay;
-
-  pSound_to_register->isPlaying = false;
-
-  pSound_to_play->uninit();
-  ma_result result = pSound_to_play->init(pEngine, musicToPlay, LOADING_FLAGS);
-  if (result != MA_SUCCESS) {
-    error_log(
-        fmt::format("Failed to initialize sound from file: {}", musicToPlay));
-    return result;
+static auto get_playing_pSound(MaComponents* pMa) -> ma_sound* {
+  ma_sound* pSound = nullptr;
+  if (!pMa) {
+    error_log("Invalid pMa in function \"get_playing_pSound\"");
+    return pSound;
   }
-
-  if (shuffle) {
-    auto music = musicList->random_out();
-    if (!music) {
-      error_log(fmt::format("Failed to get random music: {}", musicToPlay));
-      return MA_ERROR;
-    }
-    musicList->head_in(music->get_music());
+  if (pMa->pSound_to_play->is_playing() &&
+      !pMa->pSound_to_register->is_playing()) {
+    pSound = pMa->pSound_to_play->pSound.get();
+  } else if (!pMa->pSound_to_play->is_playing() &&
+             pMa->pSound_to_register->is_playing()) {
+    pSound = pMa->pSound_to_register->pSound.get();
   }
-
-  auto* pUserData(new UserData(pEngine, pSound_to_register, pSound_to_play,
-                               musicList, musicPlaying, shuffle));
-
-  ma_sound_set_end_callback(pSound_to_play->pSound.get(), sound_at_end_callback,
-                            pUserData);
-  result = ma_sound_start(pSound_to_play->pSound.get());
-  if (result != MA_SUCCESS) {
-    // TODO: log
-    error_log(fmt::format("Failed to start sound: {}", musicToPlay));
-    return result;
-  }
-  pSound_to_play->isPlaying = true;
-  fmt::print("{} started\n", musicToPlay);
-  return MA_SUCCESS;
+  return pSound;
 }
 
-auto play_later(const std::string& music, MusicList* musicList) -> void {
+auto play(MaComponents* pMa, const std::string& musicToPlay,
+          std::string* musicPlaying, MusicList* musicList,
+          SoundFinished* soundFinished, Config* config) -> ma_result {
+  ma_result result;
+  if (!pMa) {
+    error_log("Invalid MaComponents in function \"play\"");
+    return MA_ERROR;
+  }
+  if (!pMa->pSound_to_play->is_initialized() &&
+      !pMa->pSound_to_register->is_initialized()) {
+    result = play_internal(pMa->pEngine.get(), pMa->pSound_to_play.get(),
+                           musicToPlay, musicPlaying, musicList,
+                           pMa->pSound_to_register.get(), soundFinished,
+                           config->get_shuffle());
+    if (result != MA_SUCCESS) {
+      error_log(
+          fmt::format("Failed to play music: {}, error occured in function "
+                      "\"play_internal\"",
+                      musicToPlay));
+    }
+  } else {
+    play_later(config, musicToPlay, musicList);
+    result = play_next(pMa);
+    if (result != MA_SUCCESS) {
+      error_log(fmt::format(
+          "Failed to play music: {}, error occured in function  \"play_next\"",
+          musicToPlay));
+    }
+  }
+  return result;
+}
+
+auto play_later(Config* config, const std::string& music,
+                MusicList* musicList) -> void {
   if (!musicList) {
     error_log("Invalid musicList in play_later");
     return;
   }
-  if (musicList->contain(music)) {
+  if (config->get_if_redundant()) {
+    // fmt::print("{} removed: {}\n", music, musicList->remove(music));
     musicList->remove(music);
   }
   musicList->head_in(music);
-}
-
-static auto get_playing_pSound(MaComponents* pMa) -> ma_sound* {
-  ma_sound* pSound = nullptr;
-  if (!pMa) {
-    error_log("Invalid pMa in get_playing_pSound");
-    return pSound;
-  }
-  if (pMa->pSound_to_play && !pMa->pSound_to_register) {
-    if (pMa->pSound_to_play->is_playing()) {
-      pSound = pMa->pSound_to_play->pSound.get();
-    }
-  } else if (!pMa->pSound_to_play && pMa->pSound_to_register) {
-    if (pMa->pSound_to_register->is_playing()) {
-      pSound = pMa->pSound_to_register->pSound.get();
-    }
-  } else if (pMa->pSound_to_play && pMa->pSound_to_register) {
-    if (pMa->pSound_to_play->is_playing() &&
-        !pMa->pSound_to_register->is_playing()) {
-      pSound = pMa->pSound_to_play->pSound.get();
-    } else if (!pMa->pSound_to_play->is_playing() &&
-               pMa->pSound_to_register->is_playing()) {
-      pSound = pMa->pSound_to_register->pSound.get();
-    }
-  }
-  return pSound;
 }
 
 auto play_next(MaComponents* pMa) -> ma_result {
@@ -150,6 +132,13 @@ auto play_next(MaComponents* pMa) -> ma_result {
   if (result != MA_SUCCESS) {
     error_log("Failed to seek to pcm frame");
     return result;
+  }
+  if (ma_sound_is_playing(pSound) == 0U) {
+    result = ma_sound_start(pSound);
+    if (result != MA_SUCCESS) {
+      error_log("Failed to start sound");
+      return result;
+    }
   }
   return MA_SUCCESS;
 }
@@ -380,3 +369,5 @@ auto mute_toggle(ma_engine* pEngine) -> ma_result {
   }
   return MA_SUCCESS;
 }
+
+auto quit(SoundFinished* soundFinished) -> void { soundFinished->quit(); }

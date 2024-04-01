@@ -1,30 +1,28 @@
 #include <catch2/catch_test_macros.hpp>
 #include <string>
 
+#include "config.hpp"
 #include "music_list.hpp"
 
 TEST_CASE("The methods of MusicList can work properly") {
   SECTION("MusicList can be initialized from a file") {
-    std::unique_ptr<MusicList> musicList(
-        new MusicList("./tests/music_list.txt"));
+    std::unique_ptr<MusicList> musicList(new MusicList(
+        new Config(false, false, "./tests", ""), "./tests/music_list.txt"));
 
     CHECK(musicList->get_count() == 12);
-    CHECK(musicList->get_list() ==
-          std::vector<std::string>(
-              {"/Users/ketch/Music/usic/Beyond-情人.flac",
-               "/Users/ketch/Music/usic/李宗盛-山丘.wav",
-               "/Users/ketch/Music/usic/赵雷-南方姑娘 (Live).mp3",
-               "/Users/ketch/Music/usic/Beyond-灰色轨迹.flac",
-               "/Users/ketch/Music/usic/Beyond-海阔天空.wav",
-               "/Users/ketch/Music/usic/Anne-Sophie Versnaeyen,Gabriel "
-               "Saban,Philippe Briand-Shining Horizon.flac",
-               "/Users/ketch/Music/usic/Beyond-谁伴我闯荡 91.flac",
-               "/Users/ketch/Music/usic/Beyond-灰色轨迹 91.flac",
-               "/Users/ketch/Music/usic/Beyond-冷雨夜 91.flac",
-               "/Users/ketch/Music/usic/Anne-Sophie Versnaeyen,Gabriel "
-               "Saban-Facing the Past.flac",
-               "/Users/ketch/Music/usic/赵雷-我记得.wav",
-               "/Users/ketch/Music/usic/Beyond-海阔天空 05.mp3"}));
+    CHECK(
+        musicList->get_list() ==
+        std::vector<std::string>(
+            {"./tests/Beyond-情人.flac", "./tests/李宗盛-山丘.wav",
+             "./tests/赵雷-南方姑娘 (Live).mp3", "./tests/Beyond-灰色轨迹.flac",
+             "./tests/Beyond-海阔天空.wav",
+             "./tests/Anne-Sophie Versnaeyen,Gabriel "
+             "Saban,Philippe Briand-Shining Horizon.flac",
+             "./tests/Beyond-谁伴我闯荡 91.flac",
+             "./tests/Beyond-灰色轨迹 91.flac", "./tests/Beyond-冷雨夜 91.flac",
+             "./tests/Anne-Sophie Versnaeyen,Gabriel "
+             "Saban-Facing the Past.flac",
+             "./tests/赵雷-我记得.wav", "./tests/Beyond-海阔天空 05.mp3"}));
   }
 
   SECTION(

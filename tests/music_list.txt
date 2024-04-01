@@ -1,12 +1,12 @@
-/Users/ketch/Music/usic/Beyond-情人.flac
-/Users/ketch/Music/usic/李宗盛-山丘.wav
-/Users/ketch/Music/usic/赵雷-南方姑娘 (Live).mp3
-/Users/ketch/Music/usic/Beyond-灰色轨迹.flac
-/Users/ketch/Music/usic/Beyond-海阔天空.wav
-/Users/ketch/Music/usic/Anne-Sophie Versnaeyen,Gabriel Saban,Philippe Briand-Shining Horizon.flac
-/Users/ketch/Music/usic/Beyond-谁伴我闯荡 91.flac
-/Users/ketch/Music/usic/Beyond-灰色轨迹 91.flac
-/Users/ketch/Music/usic/Beyond-冷雨夜 91.flac
-/Users/ketch/Music/usic/Anne-Sophie Versnaeyen,Gabriel Saban-Facing the Past.flac
-/Users/ketch/Music/usic/赵雷-我记得.wav
-/Users/ketch/Music/usic/Beyond-海阔天空 05.mp3
+Beyond-情人.flac
+李宗盛-山丘.wav
+赵雷-南方姑娘 (Live).mp3
+Beyond-灰色轨迹.flac
+Beyond-海阔天空.wav
+Anne-Sophie Versnaeyen,Gabriel Saban,Philippe Briand-Shining Horizon.flac
+Beyond-谁伴我闯荡 91.flac
+Beyond-灰色轨迹 91.flac
+Beyond-冷雨夜 91.flac
+Anne-Sophie Versnaeyen,Gabriel Saban-Facing the Past.flac
+赵雷-我记得.wav
+Beyond-海阔天空 05.mp3
