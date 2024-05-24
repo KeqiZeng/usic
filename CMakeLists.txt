@@ -35,6 +35,15 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(fmt)
 target_link_libraries(${PROJECT_NAME} fmt::fmt)
 
+# argparse
+FetchContent_Declare(
+  argparse
+  GIT_REPOSITORY https://github.com/p-ranav/argparse
+  GIT_COMMIT 9550b0a88c85120a0bf456af935eed2956c73340
+)
+FetchContent_MakeAvailable(argparse)
+target_link_libraries(${PROJECT_NAME} argparse)
+
 # ## test ###
 FetchContent_Declare(
   Catch2

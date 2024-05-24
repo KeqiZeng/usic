@@ -6,8 +6,11 @@
 
 TEST_CASE("The methods of MusicList can work properly") {
   SECTION("MusicList can be initialized from a file") {
+    std::unique_ptr<Config> config =
+        std::make_unique<Config>(false, false, "./tests");
     std::unique_ptr<MusicList> musicList(new MusicList(
-        new Config(false, false, "./tests", ""), "./tests/music_list.txt"));
+        config.get(),
+        fmt::format("{}{}", config->get_playList_path(), "music_list.txt")));
 
     CHECK(musicList->get_count() == 12);
     CHECK(
