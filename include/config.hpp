@@ -10,14 +10,13 @@ class Config {
   bool ifRedundant;
   bool shuffle;
   std::string usicLibrary;
-  std::string musicListPath;
+  std::string playListPath;
 
  public:
-  Config(bool _nonRedundant, bool _shuffle, const std::string& _usicLibrary,
-         const std::string& _musicListPath)
+  Config(bool _nonRedundant, bool _shuffle, const std::string& _usicLibrary)
       : ifRedundant(_nonRedundant), shuffle(_shuffle) {
     if (_usicLibrary.empty()) {
-      error_log("usicLibrary can not be empty");
+      log("usicLibrary can not be empty", LogType::ERROR);
       std::exit(FATAL_ERROR);
     }
     if (_usicLibrary.back() != '/') {
@@ -25,19 +24,14 @@ class Config {
     } else {
       this->usicLibrary = _usicLibrary;
     }
-    if (!_musicListPath.empty() && _musicListPath.back() != '/') {
-      this->musicListPath =
-          fmt::format("{}{}{}", this->usicLibrary, _musicListPath, '/');
-    } else {
-      this->musicListPath =
-          fmt::format("{}{}", this->usicLibrary, _musicListPath);
-    }
+    this->playListPath =
+        fmt::format("{}{}", this->usicLibrary, PLAY_LISTS_PATH);
   }
 
   auto get_if_redundant() -> bool { return this->ifRedundant; }
   auto get_shuffle() -> bool { return this->shuffle; }
   auto get_usic_library() -> std::string { return this->usicLibrary; }
-  auto get_music_list_path() -> std::string { return this->musicListPath; }
+  auto get_playList_path() -> std::string { return this->playListPath; }
 
   // TODO
   //  auto load() -> void {}

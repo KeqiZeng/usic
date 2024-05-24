@@ -40,10 +40,10 @@ static auto timeStr_to_sec(const std::string& timeStr) -> int {
  */
 static auto sec_to_timeStr(int seconds) -> std::string {
   if (seconds < 0) {
-    error_log(
-        fmt::format("Failed to convert seconds \"{}\" to time string: seconds "
+    log(fmt::format("Failed to convert seconds \"{}\" to time string: seconds "
                     "should be >= 0",
-                    seconds));
+                    seconds),
+        LogType::ERROR);
     return "";
   }
 
@@ -56,7 +56,7 @@ static auto sec_to_timeStr(int seconds) -> std::string {
 static auto get_playing_pSound(MaComponents* pMa) -> ma_sound* {
   ma_sound* pSound = nullptr;
   if (!pMa) {
-    error_log("Invalid pMa in function \"get_playing_pSound\"");
+    log("Invalid pMa in function \"get_playing_pSound\"", LogType::ERROR);
     return pSound;
   }
   if (pMa->pSound_to_play->is_playing() &&
@@ -74,7 +74,7 @@ auto play(MaComponents* pMa, const std::string& musicToPlay,
           SoundFinished* soundFinished, Config* config) -> ma_result {
   ma_result result;
   if (!pMa) {
-    error_log("Invalid MaComponents in function \"play\"");
+    log("Invalid MaComponents in function \"play\"", LogType::ERROR);
     return MA_ERROR;
   }
   if (!pMa->pSound_to_play->is_initialized() &&
@@ -84,18 +84,19 @@ auto play(MaComponents* pMa, const std::string& musicToPlay,
                            pMa->pSound_to_register.get(), soundFinished,
                            config->get_shuffle());
     if (result != MA_SUCCESS) {
-      error_log(
-          fmt::format("Failed to play music: {}, error occured in function "
+      log(fmt::format("Failed to play music: {}, error occured in function "
                       "\"play_internal\"",
-                      musicToPlay));
+                      musicToPlay),
+          LogType::ERROR);
     }
   } else {
     play_later(config, musicToPlay, musicList);
     result = play_next(pMa);
     if (result != MA_SUCCESS) {
-      error_log(fmt::format(
-          "Failed to play music: {}, error occured in function  \"play_next\"",
-          musicToPlay));
+      log(fmt::format("Failed to play music: {}, error occured in function  "
+                      "\"play_next\"",
+                      musicToPlay),
+          LogType::ERROR);
     }
   }
   return result;
@@ -104,7 +105,7 @@ auto play(MaComponents* pMa, const std::string& musicToPlay,
 auto play_later(Config* config, const std::string& music,
                 MusicList* musicList) -> void {
   if (!musicList) {
-    error_log("Invalid musicList in play_later");
+    log("Invalid musicList in play_later", LogType::ERROR);
     return;
   }
   if (config->get_if_redundant()) {
@@ -118,25 +119,25 @@ auto play_next(MaComponents* pMa) -> ma_result {
   ma_sound* pSound = get_playing_pSound(pMa);
   if (pSound == nullptr) {
     // TODO: log
-    error_log("Failed to get playing pSound");
+    log("Failed to get playing pSound", LogType::ERROR);
     return MA_ERROR;
   }
 
   ma_uint64 length = 0;
   ma_result result = ma_sound_get_length_in_pcm_frames(pSound, &length);
   if (result != MA_SUCCESS) {
-    error_log("Failed to get length in pcm frames");
+    log("Failed to get length in pcm frames", LogType::ERROR);
     return result;
   }
   result = ma_sound_seek_to_pcm_frame(pSound, length);
   if (result != MA_SUCCESS) {
-    error_log("Failed to seek to pcm frame");
+    log("Failed to seek to pcm frame", LogType::ERROR);
     return result;
   }
   if (ma_sound_is_playing(pSound) == 0U) {
     result = ma_sound_start(pSound);
     if (result != MA_SUCCESS) {
-      error_log("Failed to start sound");
+      log("Failed to start sound", LogType::ERROR);
       return result;
     }
   }
@@ -145,12 +146,12 @@ auto play_next(MaComponents* pMa) -> ma_result {
 
 auto play_prev(MaComponents* pMa, MusicList* musicList) -> ma_result {
   if (!musicList || musicList->is_empty()) {
-    error_log("Invalid musicList in play_prev");
+    log("Invalid musicList in play_prev", LogType::ERROR);
     return MA_ERROR;
   }
   auto prevMusic = musicList->tail_out();
   if (prevMusic == nullptr) {
-    error_log("Failed to get prev music");
+    log("Failed to get prev music", LogType::ERROR);
     return MA_ERROR;
   }
   musicList->head_in(prevMusic->get_music());

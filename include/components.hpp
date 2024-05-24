@@ -45,7 +45,7 @@ class SoundPack {
             ma_uint32 flags) -> ma_result {
     std::lock_guard<std::mutex> lock(this->mtx);
     if (this->isInitialized) {
-      error_log("Can not init sound twice");
+      log("Can not init sound twice", LogType::ERROR);
       return MA_ERROR;
     }
     if (!this->pSound) {
@@ -66,7 +66,7 @@ class SoundPack {
       ma_sound_uninit(this->pSound.get());
       this->isInitialized = false;
       this->isPlaying = false;
-      fmt::print("uninit sound\n");
+      log("uninit sound", LogType::INFO);
     }
   }
 
@@ -95,6 +95,9 @@ class SoundFinished {
     this->quitFlag = true;
     this->cv.notify_one();
   }
+
+  auto is_finished() -> bool { return this->finished; }
+  auto get_quit_flag() -> bool { return this->quitFlag; }
 };
 
 class UserData {
@@ -136,7 +139,7 @@ class MaComponents {
   auto ma_comp_init_engine() -> ma_result {
     ma_result result = ma_engine_init(nullptr, pEngine.get());
     if (result != MA_SUCCESS) {
-      error_log("Failed to initialize engine");
+      log("Failed to initialize engine", LogType::ERROR);
     }
     return result;
   }

@@ -50,7 +50,7 @@ class MusicList {
       }
       file.close();
     } else {
-      error_log(fmt::format("Failed to open file: {}", listFile));
+      log(fmt::format("Failed to open file: {}", listFile), LogType::ERROR);
     }
   }
   ~MusicList() {
@@ -61,6 +61,24 @@ class MusicList {
       temp->prev.reset();
       temp->next.reset();
       temp.reset();
+    }
+  }
+
+  auto load(const std::string& listPath, Config* config,
+            bool reload = true) -> void {
+    if (reload) {
+      this->clear();
+    }
+    std::ifstream file(listPath.c_str());
+    if (file.is_open()) {
+      std::string line;
+      while (std::getline(file, line)) {
+        line = fmt::format("{}{}", config->get_usic_library(), line);
+        this->tail_in(line);
+      }
+      file.close();
+    } else {
+      log(fmt::format("Failed to open file: {}", listPath), LogType::ERROR);
     }
   }
 
