@@ -17,16 +17,16 @@ void sound_at_end_callback(void* pUserData, ma_sound* pSound) {
 
   const std::string musicToPlay = pData->musicList->head_out()->get_music();
 
-  ma_result result = play_internal(pData->pEngine, pData->pSound_to_play,
-                                   musicToPlay, pData->musicPlaying,
-                                   pData->musicList, pData->pSound_to_register,
-                                   pData->soundFinished, pData->shuffle);
+  ma_result result =
+      play_internal(pData->pEngine, pData->pSound_to_play, musicToPlay,
+                    pData->musicPlaying, pData->musicList,
+                    pData->pSound_to_register, pData->endFlag, pData->shuffle);
   if (result != MA_SUCCESS) {
     // TODO: log and change the loopFlag in main
     log(fmt::format("Failed to play music: {}", musicToPlay), LogType::ERROR);
     std::exit(FATAL_ERROR);
   }
-  pData->soundFinished->signal();
+  pData->endFlag->signal();
   delete pData;
 }
 

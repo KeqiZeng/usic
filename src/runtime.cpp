@@ -35,9 +35,9 @@ auto server_is_running() -> bool {
   return false;  // server is not running
 }
 
-auto setup_runtime(Pipe* pipeToServer, Pipe* pipeToClient) -> void {
+auto setup_runtime() -> void {
   if (!std::getenv("HOME")) {
-    log("Failed to get environment variable: HOME", LogType::ERROR);
+    fmt::print(stderr, "Failed to get environment variable: HOME\n");
     std::exit(FATAL_ERROR);
   }
   // create runtime path
@@ -52,25 +52,17 @@ auto setup_runtime(Pipe* pipeToServer, Pipe* pipeToClient) -> void {
   if (std::filesystem::exists(INFO_LOG_FILE)) {
     std::filesystem::remove(INFO_LOG_FILE);
   }
-
-  if (pipeToServer->setup() == -1) {
-    log("Failed to setup pipeToServer", LogType::ERROR);
-    std::exit(FATAL_ERROR);
-  }
-  if (pipeToClient->setup() == -1) {
-    log("Failed to setup pipeToClient", LogType::ERROR);
-    std::exit(FATAL_ERROR);
-  }
-
-  // if (pipeToServer->open_pipe(O_RDONLY) != 0) {
-  //   log("Failed to open pipeToServer", LogType::ERROR);
-  //   std::exit(FATAL_ERROR);
-  // }
-  // if (pipeToClient->open_pipe(O_WRONLY) != 0) {
-  //   log("Failed to open pipeToClient", LogType::ERROR);
-  //   std::exit(FATAL_ERROR);
-  // }
 }
+
+//   if (pipeToServer->setup() == -1) {
+//     log("Failed to setup pipeToServer", LogType::ERROR);
+//     std::exit(FATAL_ERROR);
+//   }
+//   if (pipeToClient->setup() == -1) {
+//     log("Failed to setup pipeToClient", LogType::ERROR);
+//     std::exit(FATAL_ERROR);
+//   }
+// }
 
 auto static error_log(std::string_view error) -> void {
   auto errorLog = fmt::output_file(

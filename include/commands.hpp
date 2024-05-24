@@ -5,8 +5,8 @@
 #include "music_list.hpp"
 
 auto play(MaComponents* pMa, const std::string& musicToPlay,
-          std::string* musicPlaying, MusicList* musicList,
-          SoundFinished* soundFinished, Config* config) -> ma_result;
+          std::string* musicPlaying, MusicList* musicList, EndFlag* endFlag,
+          Config* config) -> ma_result;
 auto play_later(Config* config, const std::string& music,
                 MusicList* music_list) -> void;
 auto play_next(MaComponents* pMa) -> ma_result;
@@ -19,4 +19,4 @@ auto get_current_progress(MaComponents* pMa,
 auto adjust_volume(ma_engine* pEngine, float diff) -> ma_result;
 auto get_volume(ma_engine* pEngine, float* volume) -> ma_result;
 auto mute_toggle(ma_engine* pEngine) -> ma_result;
-auto quit(SoundFinished* soundFinished) -> void;
+auto quit(EndFlag* endFlag) -> void;

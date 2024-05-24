@@ -11,7 +11,7 @@
 auto play_internal(ma_engine* pEngine, SoundPack* pSound_to_play,
                    const std::string& musicToPlay, std::string* musicPlaying,
                    MusicList* musicList, SoundPack* pSound_to_register,
-                   SoundFinished* soundFinished, bool shuffle) -> ma_result {
+                   EndFlag* endFlag, bool shuffle) -> ma_result {
   *musicPlaying = musicToPlay;
 
   {
@@ -37,8 +37,7 @@ auto play_internal(ma_engine* pEngine, SoundPack* pSound_to_play,
   }
 
   auto* pUserData(new UserData(pEngine, pSound_to_register, pSound_to_play,
-                               soundFinished, musicList, musicPlaying,
-                               shuffle));
+                               endFlag, musicList, musicPlaying, shuffle));
 
   ma_sound_set_end_callback(pSound_to_play->pSound.get(), sound_at_end_callback,
                             pUserData);
@@ -55,13 +54,13 @@ auto play_internal(ma_engine* pEngine, SoundPack* pSound_to_play,
   return MA_SUCCESS;
 }
 
-auto cleanFunc(MaComponents* pMa, SoundFinished* soundFinished) -> void {
-  std::unique_lock<std::mutex> lock(soundFinished->mtx);
+auto cleanFunc(MaComponents* pMa, EndFlag* endFlag) -> void {
+  std::unique_lock<std::mutex> lock(endFlag->mtx);
   while (true) {
-    soundFinished->cv.wait(lock, [soundFinished] {
-      return soundFinished->is_finished() || soundFinished->get_quit_flag();
+    endFlag->cv.wait(lock, [endFlag] {
+      return endFlag->at_end() || endFlag->get_quit_flag();
     });
-    if (soundFinished->get_quit_flag()) {
+    if (endFlag->get_quit_flag()) {
       log("Cleaner quit", LogType::INFO);
       return;
     }
@@ -73,7 +72,6 @@ auto cleanFunc(MaComponents* pMa, SoundFinished* soundFinished) -> void {
         pMa->pSound_to_register->is_initialized()) {
       pMa->pSound_to_register->uninit();
     }
-    soundFinished->reset();
+    endFlag->reset();
   }
-}
 }

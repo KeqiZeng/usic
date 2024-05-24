@@ -70,8 +70,8 @@ static auto get_playing_pSound(MaComponents* pMa) -> ma_sound* {
 }
 
 auto play(MaComponents* pMa, const std::string& musicToPlay,
-          std::string* musicPlaying, MusicList* musicList,
-          SoundFinished* soundFinished, Config* config) -> ma_result {
+          std::string* musicPlaying, MusicList* musicList, EndFlag* endFlag,
+          Config* config) -> ma_result {
   ma_result result;
   if (!pMa) {
     log("Invalid MaComponents in function \"play\"", LogType::ERROR);
@@ -81,7 +81,7 @@ auto play(MaComponents* pMa, const std::string& musicToPlay,
       !pMa->pSound_to_register->is_initialized()) {
     result = play_internal(pMa->pEngine.get(), pMa->pSound_to_play.get(),
                            musicToPlay, musicPlaying, musicList,
-                           pMa->pSound_to_register.get(), soundFinished,
+                           pMa->pSound_to_register.get(), endFlag,
                            config->get_shuffle());
     if (result != MA_SUCCESS) {
       log(fmt::format("Failed to play music: {}, error occured in function "
@@ -371,4 +371,4 @@ auto mute_toggle(ma_engine* pEngine) -> ma_result {
   return MA_SUCCESS;
 }
 
-auto quit(SoundFinished* soundFinished) -> void { soundFinished->quit(); }
+auto quit(EndFlag* endFlag) -> void { endFlag->quit(); }

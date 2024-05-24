@@ -23,8 +23,7 @@ class SoundPack {
   friend auto play_internal(ma_engine* pEngine, SoundPack* pSound_to_play,
                             const std::string& musicToPlay,
                             std::string* musicPlaying, MusicList* musicList,
-                            SoundPack* pSound_to_register,
-                            SoundFinished* soundFinished,
+                            SoundPack* pSound_to_register, EndFlag* endFlag,
                             bool shuffle) -> ma_result;
 
  private:
@@ -74,29 +73,28 @@ class SoundPack {
   auto is_playing() -> bool { return this->isPlaying; }
 };
 
-class SoundFinished {
-  friend auto cleanFunc(MaComponents* pMa,
-                        SoundFinished* soundFinished) -> void;
+class EndFlag {
+  friend auto cleanFunc(MaComponents* pMa, EndFlag* endFlag) -> void;
   std::mutex mtx;
   std::condition_variable cv;
-  bool finished{false};
+  bool end{false};
   bool quitFlag{false};
 
  public:
   auto signal() -> void {
     std::lock_guard<std::mutex> lock(this->mtx);
-    this->finished = true;
+    this->end = true;
     this->cv.notify_one();
   }
 
-  auto reset() -> void { this->finished = false; }
+  auto reset() -> void { this->end = false; }
   auto quit() -> void {
     std::lock_guard<std::mutex> lock(this->mtx);
     this->quitFlag = true;
     this->cv.notify_one();
   }
 
-  auto is_finished() -> bool { return this->finished; }
+  auto at_end() -> bool { return this->end; }
   auto get_quit_flag() -> bool { return this->quitFlag; }
 };
 
@@ -105,18 +103,18 @@ class UserData {
   ma_engine* pEngine;
   SoundPack* pSound_to_play;
   SoundPack* pSound_to_register;
-  SoundFinished* soundFinished;
+  EndFlag* endFlag;
   MusicList* musicList;
   std::string* musicPlaying;
   bool shuffle;
 
   UserData(ma_engine* _pEngine, SoundPack* _pSound_to_play,
-           SoundPack* _pSound_to_register, SoundFinished* _soundFinished,
+           SoundPack* _pSound_to_register, EndFlag* _endFlag,
            MusicList* _musicList, std::string* _musicPlaying, bool _shuffle)
       : pEngine(_pEngine),
         pSound_to_play(_pSound_to_play),
         pSound_to_register(_pSound_to_register),
-        soundFinished(_soundFinished),
+        endFlag(_endFlag),
         musicList(_musicList),
         musicPlaying(_musicPlaying),
         shuffle(_shuffle) {}

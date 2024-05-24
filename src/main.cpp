@@ -15,33 +15,33 @@
 #include "runtime.hpp"
 
 auto main() -> int {
-  setup();
+  setup_runtime();
   std::unique_ptr<Config> config(
-      new Config(false, true, "/Users/ketch/Music/usic", "playLists"));
+      new Config(false, true, "/Users/ketch/Music/usic"));
   std::unique_ptr<MaComponents> pMa(new MaComponents());
   ma_result result = pMa->ma_comp_init_engine();
 
   std::unique_ptr<MusicList> musicList(new MusicList(
       config.get(),
-      fmt::format("{}{}", config->get_music_list_path(), "Default_.txt")));
+      fmt::format("{}{}", config->get_playList_path(), "Default.txt")));
   if (musicList->is_empty()) {
-    error_log("Failed to load music list");
+    log("Failed to load music list", LogType::ERROR);
     std::exit(FATAL_ERROR);
   }
 
   std::unique_ptr<std::string> musicPlaying(new std::string);
 
-  std::unique_ptr<SoundFinished> soundFinished(new SoundFinished);
+  std::unique_ptr<EndFlag> endFlag(new EndFlag);
 
   const std::string& musicToPlay = musicList->random_out()->get_music();
   result = play(pMa.get(), musicToPlay, musicPlaying.get(), musicList.get(),
-                soundFinished.get(), config.get());
+                endFlag.get(), config.get());
   if (result != MA_SUCCESS) {
-    error_log(fmt::format("Failed to play music: {}", musicToPlay));
+    log(fmt::format("Failed to play music: {}", musicToPlay), LogType::ERROR);
     std::exit(FATAL_ERROR);
   }
 
-  std::thread cleaner(cleanFunc, pMa.get(), soundFinished.get());
+  std::thread cleaner(cleanFunc, pMa.get(), endFlag.get());
   cleaner.detach();
 
   fmt::print("Press Enter to continue...");
@@ -80,13 +80,13 @@ auto main() -> int {
   fmt::print("Press Enter to continue...");
   std::cin.get();
   // result = play(pMa.get(), "/Users/ketch/Music/usic/Beyond - 情人.flac",
-  //               musicPlaying.get(), musicList.get(), soundFinished.get(),
+  //               musicPlaying.get(), musicList.get(), endFlag.get(),
   //               config.get());
   // fmt::print("Press Enter to continue...");
   // std::cin.get();
   const std::string& musicToPlay_2 = musicList->random_out()->get_music();
   result = play(pMa.get(), musicToPlay_2, musicPlaying.get(), musicList.get(),
-                soundFinished.get(), config.get());
+                endFlag.get(), config.get());
   // float volume = 0.0F;
   // get_volume(pMa->pEngine.get(), &volume);
   // fmt::print("volume: {:.2f}\n", volume);
@@ -111,7 +111,7 @@ auto main() -> int {
 
   fmt::print("Press Enter to continue...");
   std::cin.get();
-  quit(soundFinished.get());
+  quit(endFlag.get());
   fmt::print("Press Enter to continue...");
   std::cin.get();
   return 0;
