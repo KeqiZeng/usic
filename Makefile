@@ -1,12 +1,13 @@
 #Makefile
 
+PROJECT_NAME = usic
+
 .PHONY: build_debug build_release run test install clean
 
 build_debug:
 	@cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
 	@cp ./build/compile_commands.json .
 	@cmake --build build
-	@./build/usic_tests
 
 build_release:
 	@cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -14,14 +15,16 @@ build_release:
 	@cmake --build build
 
 run:
-	@./build/usic
+	@./build/${PROJECT_NAME}
 
 test:
-	@./build/usic_tests
+	@cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON
+	@cmake --build build --target ${PROJECT_NAME}_tests
+	@./build/tests/${PROJECT_NAME}_tests
 
 install:
-	@install -m 755 ./build/usic /usr/local/bin
-	@echo "\033[32music has been installed into /usr/local/bin\033[0m"
+	@install -m 755 ./build/${PROJECT_NAME} /usr/local/bin
+	@echo "\033[32m${PROJECT_NAME} has been installed into /usr/local/bin\033[0m"
 
 with_script:
 	@cp ./scripts/usic_play_list.sh /usr/local/bin/usic_play_list

@@ -34,28 +34,9 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(fmt)
 target_link_libraries(${PROJECT_NAME} fmt::fmt)
 
-# argparse
-# FetchContent_Declare(
-# argparse
-# GIT_REPOSITORY https://github.com/p-ranav/argparse
-# GIT_COMMIT 9550b0a88c85120a0bf456af935eed2956c73340
-# )
-# FetchContent_MakeAvailable(argparse)
-# target_link_libraries(${PROJECT_NAME} argparse)
-
 # ## test ###
-FetchContent_Declare(
-  Catch2
-  GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-  GIT_TAG v3.5.3
-)
-FetchContent_MakeAvailable(Catch2)
+option(BUILD_TESTING "Build test targets" OFF)
 
-file(GLOB TEST_FILES "tests/*.cc")
-add_executable(${PROJECT_NAME}_tests ${TEST_FILES} src/music_list.cc src/runtime.cc src/utils.cc)
-target_link_libraries(${PROJECT_NAME}_tests PRIVATE Catch2::Catch2WithMain fmt::fmt)
-target_include_directories(${PROJECT_NAME}_tests PRIVATE ${PROJECT_SOURCE_DIR}/src)
-list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
-include(CTest)
-include(Catch)
-catch_discover_tests(${PROJECT_NAME}_tests)
+if(BUILD_TESTING)
+  add_subdirectory(tests)
+endif()
