@@ -10,8 +10,7 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
 endif()
 
 project(usic)
-include_directories(include)
-set(SOURCES src/main.cpp src/core.cpp src/commands.cpp src/callback.cpp src/runtime.cpp)
+set(SOURCES src/usic.cc src/commands.cc src/core.cc src/music_list.cc src/runtime.cc src/utils.cc)
 add_executable(${PROJECT_NAME} ${SOURCES})
 
 include(FetchContent)
@@ -36,13 +35,13 @@ FetchContent_MakeAvailable(fmt)
 target_link_libraries(${PROJECT_NAME} fmt::fmt)
 
 # argparse
-FetchContent_Declare(
-  argparse
-  GIT_REPOSITORY https://github.com/p-ranav/argparse
-  GIT_COMMIT 9550b0a88c85120a0bf456af935eed2956c73340
-)
-FetchContent_MakeAvailable(argparse)
-target_link_libraries(${PROJECT_NAME} argparse)
+# FetchContent_Declare(
+# argparse
+# GIT_REPOSITORY https://github.com/p-ranav/argparse
+# GIT_COMMIT 9550b0a88c85120a0bf456af935eed2956c73340
+# )
+# FetchContent_MakeAvailable(argparse)
+# target_link_libraries(${PROJECT_NAME} argparse)
 
 # ## test ###
 FetchContent_Declare(
@@ -52,9 +51,10 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(Catch2)
 
-file(GLOB TEST_FILES "tests/*.cpp")
-add_executable(${PROJECT_NAME}_tests ${TEST_FILES} src/runtime.cpp)
+file(GLOB TEST_FILES "tests/*.cc")
+add_executable(${PROJECT_NAME}_tests ${TEST_FILES} src/music_list.cc src/runtime.cc src/utils.cc)
 target_link_libraries(${PROJECT_NAME}_tests PRIVATE Catch2::Catch2WithMain fmt::fmt)
+target_include_directories(${PROJECT_NAME}_tests PRIVATE ${PROJECT_SOURCE_DIR}/src)
 list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
 include(CTest)
 include(Catch)

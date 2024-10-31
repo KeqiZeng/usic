@@ -1,13 +1,16 @@
 #include <catch2/catch_test_macros.hpp>
+#include <fstream>
 #include <string>
+#include <vector>
 
-#include "config.hpp"
-#include "music_list.hpp"
+#include "fmt/core.h"
+#include "music_list.h"
+#include "runtime.h"
 
 TEST_CASE("The methods of MusicList can work properly") {
   SECTION("MusicList can be initialized from a file") {
     std::unique_ptr<Config> config =
-        std::make_unique<Config>(false, false, "./tests");
+        std::make_unique<Config>(false, false, "./tests", "playLists/");
     std::unique_ptr<MusicList> musicList(new MusicList(
         config.get(),
         fmt::format("{}{}", config->get_playList_path(), "music_list.txt")));

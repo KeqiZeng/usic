@@ -1,59 +1,18 @@
-#include "commands.hpp"
+#include "commands.h"
 
-#include <fstream>
-#include <sstream>
-#include <string>
-#include <utility>
-
-#include "constants.hpp"
-#include "fmt/core.h"
-#include "runtime.hpp"
-
-/*
- * Convert time(string like mm:ss) to seconds(int).
- */
-static auto timeStr_to_sec(const std::string& timeStr) -> int {
-  int min = 0;
-  int sec = 0;
-
-  std::istringstream iss(timeStr);
-  char colon;
-  if (!(iss >> min >> colon >> sec) || colon != ':') {
-    return -1;  // failed conversion
-  }
-
-  // minutes should not be less than 0
-  if (min < 0) {
-    return -1;
-  }
-
-  // seconds should be 0-60
-  if (sec < 0 || sec > SECONDS_PER_MINUTE) {
-    return -1;
-  }
-
-  return min * SECONDS_PER_MINUTE + sec;
+void Progress::init(const std::string& _str, float _percent) {
+  this->str = std::move(_str);
+  this->percent = _percent;
 }
 
-/*
- * Convert seconds(int) to time(string like mm:ss).
- */
-static auto sec_to_timeStr(int seconds) -> std::string {
-  if (seconds < 0) {
-    log(fmt::format("Failed to convert seconds \"{}\" to time string: seconds "
-                    "should be >= 0",
-                    seconds),
-        LogType::ERROR);
-    return "";
-  }
-
-  int min = seconds / SECONDS_PER_MINUTE;
-  int sec = seconds % SECONDS_PER_MINUTE;
-
-  return fmt::format("{:d}:{:02d}", min, sec);
+const std::string Progress::make_bar() {
+  int n = percent * PROGRESS_BAR_LENGTH;
+  std::string bar(PROGRESS_BAR_LENGTH, BAR_ELEMENT);
+  bar[n] = CURSOR_ELEMENT;
+  return fmt::format("{} {}\n", bar, str);
 }
 
-static auto get_playing_pSound(MaComponents* pMa) -> ma_sound* {
+static ma_sound* get_playing_pSound(MaComponents* pMa) {
   ma_sound* pSound = nullptr;
   if (!pMa) {
     log("Invalid pMa in function \"get_playing_pSound\"", LogType::ERROR);
@@ -69,9 +28,9 @@ static auto get_playing_pSound(MaComponents* pMa) -> ma_sound* {
   return pSound;
 }
 
-auto play(MaComponents* pMa, const std::string& musicToPlay,
-          std::string* musicPlaying, MusicList* musicList, EndFlag* endFlag,
-          Config* config) -> ma_result {
+ma_result play(MaComponents* pMa, const std::string& musicToPlay,
+               std::string* musicPlaying, MusicList* musicList,
+               QuitControl* quitC, Config* config) {
   ma_result result;
   if (!pMa) {
     log("Invalid MaComponents in function \"play\"", LogType::ERROR);
@@ -81,8 +40,8 @@ auto play(MaComponents* pMa, const std::string& musicToPlay,
       !pMa->pSound_to_register->is_initialized()) {
     result = play_internal(pMa->pEngine.get(), pMa->pSound_to_play.get(),
                            musicToPlay, musicPlaying, musicList,
-                           pMa->pSound_to_register.get(), endFlag,
-                           config->get_shuffle());
+                           pMa->pSound_to_register.get(), quitC,
+                           config->is_random());
     if (result != MA_SUCCESS) {
       log(fmt::format("Failed to play music: {}, error occured in function "
                       "\"play_internal\"",
@@ -102,20 +61,20 @@ auto play(MaComponents* pMa, const std::string& musicToPlay,
   return result;
 }
 
-auto play_later(Config* config, const std::string& music,
-                MusicList* musicList) -> void {
+void play_later(Config* config, const std::string& music,
+                MusicList* musicList) {
   if (!musicList) {
     log("Invalid musicList in play_later", LogType::ERROR);
     return;
   }
-  if (config->get_if_redundant()) {
+  if (config->is_repetitive()) {
     // fmt::print("{} removed: {}\n", music, musicList->remove(music));
     musicList->remove(music);
   }
   musicList->head_in(music);
 }
 
-auto play_next(MaComponents* pMa) -> ma_result {
+ma_result play_next(MaComponents* pMa) {
   ma_sound* pSound = get_playing_pSound(pMa);
   if (pSound == nullptr) {
     // TODO: log
@@ -144,7 +103,7 @@ auto play_next(MaComponents* pMa) -> ma_result {
   return MA_SUCCESS;
 }
 
-auto play_prev(MaComponents* pMa, MusicList* musicList) -> ma_result {
+ma_result play_prev(MaComponents* pMa, MusicList* musicList) {
   if (!musicList || musicList->is_empty()) {
     log("Invalid musicList in play_prev", LogType::ERROR);
     return MA_ERROR;
@@ -158,7 +117,7 @@ auto play_prev(MaComponents* pMa, MusicList* musicList) -> ma_result {
   return play_next(pMa);
 }
 
-auto pause_resume(MaComponents* pMa) -> ma_result {
+ma_result pause_resume(MaComponents* pMa) {
   ma_sound* pSound = get_playing_pSound(pMa);
   if (pSound == nullptr) {
     // TODO: log
@@ -184,7 +143,23 @@ auto pause_resume(MaComponents* pMa) -> ma_result {
   return MA_SUCCESS;
 }
 
-auto move_cursor(MaComponents* pMa, int seconds) -> ma_result {
+ma_result stop(MaComponents* pMa) {
+  ma_sound* pSound = get_playing_pSound(pMa);
+  if (pSound == nullptr) {
+    // TODO: log
+    return MA_ERROR;
+  }
+
+  ma_result result;
+  result = ma_sound_stop(pSound);
+  if (result != MA_SUCCESS) {
+    // TODO: log
+    return result;
+  }
+  return MA_SUCCESS;
+}
+
+ma_result move_cursor(MaComponents* pMa, int seconds) {
   ma_sound* pSound = get_playing_pSound(pMa);
   if (pSound == nullptr) {
     // TODO: log
@@ -227,7 +202,7 @@ auto move_cursor(MaComponents* pMa, int seconds) -> ma_result {
   return result;
 }
 
-auto set_cursor(MaComponents* pMa, const std::string& time) -> ma_result {
+ma_result set_cursor(MaComponents* pMa, const std::string& time) {
   ma_sound* pSound = get_playing_pSound(pMa);
   if (pSound == nullptr) {
     // TODO: log
@@ -235,7 +210,7 @@ auto set_cursor(MaComponents* pMa, const std::string& time) -> ma_result {
   }
 
   // Convert the time string to seconds
-  int destination = timeStr_to_sec(time);
+  int destination = utils::timeStr_to_sec(time);
   if (destination == -1) {
     return MA_INVALID_ARGS;
   }
@@ -264,8 +239,7 @@ auto set_cursor(MaComponents* pMa, const std::string& time) -> ma_result {
   return result;
 }
 
-auto get_current_progress(MaComponents* pMa,
-                          Progress* currentProgress) -> ma_result {
+ma_result get_current_progress(MaComponents* pMa, Progress* currentProgress) {
   ma_sound* pSound = get_playing_pSound(pMa);
   if (pSound == nullptr) {
     // TODO: log
@@ -273,7 +247,7 @@ auto get_current_progress(MaComponents* pMa,
   }
 
   float cursor = 0.0F;
-  float length = 0.0F;
+  float duration = 0.0F;
 
   // Get the current cursor position
   ma_result result = ma_sound_get_cursor_in_seconds(pSound, &cursor);
@@ -281,27 +255,38 @@ auto get_current_progress(MaComponents* pMa,
     return result;
   }
 
-  // Get the total length of the sound
-  result = ma_sound_get_length_in_seconds(pSound, &length);
+  // Get the duration of the sound
+  result = ma_sound_get_length_in_seconds(pSound, &duration);
   if (result != MA_SUCCESS) {
     // TODO: log
     return result;
   }
 
   cursor = round(cursor);
-  length = round(length);
+  duration = round(duration);
 
-  std::string cursorStr = sec_to_timeStr(cursor);
-  std::string lengthStr = sec_to_timeStr(length);
-  if (cursorStr.empty() || lengthStr.empty()) {
-    // TODO: log
+  std::string cursorStr = utils::sec_to_timeStr(cursor);
+  std::string durationStr = utils::sec_to_timeStr(duration);
+  if (cursorStr.empty()) {
+    log(fmt::format("Failed to convert cursor position \"{}\" to time string: "
+                    "cursor position "
+                    "should be >= 0",
+                    cursor),
+        LogType::ERROR);
+    return MA_ERROR;
+  }
+  if (durationStr.empty()) {
+    log(fmt::format(
+            "Failed to convert duration \"{}\" to time string: duration "
+            "should be >= 0",
+            duration),
+        LogType::ERROR);
     return MA_ERROR;
   }
 
-  std::string _str = fmt::format("{}/{}", cursorStr, lengthStr);
+  std::string _str = fmt::format("{}/{}", cursorStr, durationStr);
   if (!_str.empty()) {
-    currentProgress->str = std::move(_str);
-    currentProgress->percent = cursor / length;
+    currentProgress->init(_str, cursor / duration);
   } else {
     // TODO: log
     return MA_ERROR;
@@ -313,7 +298,7 @@ auto get_current_progress(MaComponents* pMa,
  * Adjust the volume of the engine, which should be 0.0-1.0.
  * The parameter "diff" indicates the step length.
  */
-auto adjust_volume(ma_engine* pEngine, float diff) -> ma_result {
+ma_result adjust_volume(ma_engine* pEngine, float diff) {
   ma_device* pDevice = ma_engine_get_device(pEngine);
 
   // Get current volume of the engine
@@ -340,13 +325,13 @@ auto adjust_volume(ma_engine* pEngine, float diff) -> ma_result {
 /*
  * Get the volume of the engine and print it as 0-100%
  */
-auto get_volume(ma_engine* pEngine, float* volume) -> ma_result {
+ma_result get_volume(ma_engine* pEngine, float* volume) {
   ma_device* pDevice = ma_engine_get_device(pEngine);
 
   return ma_device_get_master_volume(pDevice, volume);
 }
 
-auto mute_toggle(ma_engine* pEngine) -> ma_result {
+ma_result mute_toggle(ma_engine* pEngine) {
   ma_device* pDevice = ma_engine_get_device(pEngine);
 
   float currentVolume = 0.0;
@@ -371,4 +356,9 @@ auto mute_toggle(ma_engine* pEngine) -> ma_result {
   return MA_SUCCESS;
 }
 
-auto quit(EndFlag* endFlag) -> void { endFlag->quit(); }
+void quit(MaComponents* pMa, QuitControl* quitC) {
+  if (stop(pMa) != MA_SUCCESS) {
+    log("Failed to stop music", LogType::ERROR);
+  }
+  quitC->quit();
+}
