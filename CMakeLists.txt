@@ -10,7 +10,7 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
 endif()
 
 project(usic)
-set(SOURCES src/usic.cc src/commands.cc src/core.cc src/music_list.cc src/runtime.cc src/utils.cc)
+set(SOURCES src/usic.cc src/client.cc src/commands.cc src/core.cc src/music_list.cc src/runtime.cc src/server.cc src/utils.cc)
 add_executable(${PROJECT_NAME} ${SOURCES})
 
 include(FetchContent)

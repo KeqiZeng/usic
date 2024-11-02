@@ -9,7 +9,7 @@ const std::string Progress::make_bar() {
   int n = percent * PROGRESS_BAR_LENGTH;
   std::string bar(PROGRESS_BAR_LENGTH, BAR_ELEMENT);
   bar[n] = CURSOR_ELEMENT;
-  return fmt::format("{} {}\n", bar, str);
+  return fmt::format("{} {}", bar, str);
 }
 
 static ma_sound* get_playing_pSound(MaComponents* pMa) {
@@ -28,6 +28,12 @@ static ma_sound* get_playing_pSound(MaComponents* pMa) {
   return pSound;
 }
 
+namespace Commands {
+
+void load(const std::string& listPath, MusicList* musicList, Config* config) {
+  musicList->load(listPath, config);
+}
+
 ma_result play(MaComponents* pMa, const std::string& musicToPlay,
                std::string* musicPlaying, MusicList* musicList,
                QuitControl* quitC, Config* config) {
@@ -41,7 +47,7 @@ ma_result play(MaComponents* pMa, const std::string& musicToPlay,
     result = play_internal(pMa->pEngine.get(), pMa->pSound_to_play.get(),
                            musicToPlay, musicPlaying, musicList,
                            pMa->pSound_to_register.get(), quitC,
-                           config->is_random());
+                           config->get_random_p(), config->get_repetitive_p());
     if (result != MA_SUCCESS) {
       log(fmt::format("Failed to play music: {}, error occured in function "
                       "\"play_internal\"",
@@ -67,7 +73,7 @@ void play_later(Config* config, const std::string& music,
     log("Invalid musicList in play_later", LogType::ERROR);
     return;
   }
-  if (config->is_repetitive()) {
+  if (!config->is_repetitive()) {
     // fmt::print("{} removed: {}\n", music, musicList->remove(music));
     musicList->remove(music);
   }
@@ -143,23 +149,7 @@ ma_result pause_resume(MaComponents* pMa) {
   return MA_SUCCESS;
 }
 
-ma_result stop(MaComponents* pMa) {
-  ma_sound* pSound = get_playing_pSound(pMa);
-  if (pSound == nullptr) {
-    // TODO: log
-    return MA_ERROR;
-  }
-
-  ma_result result;
-  result = ma_sound_stop(pSound);
-  if (result != MA_SUCCESS) {
-    // TODO: log
-    return result;
-  }
-  return MA_SUCCESS;
-}
-
-ma_result move_cursor(MaComponents* pMa, int seconds) {
+static ma_result move_cursor(MaComponents* pMa, int seconds) {
   ma_sound* pSound = get_playing_pSound(pMa);
   if (pSound == nullptr) {
     // TODO: log
@@ -200,6 +190,13 @@ ma_result move_cursor(MaComponents* pMa, int seconds) {
     return result;
   }
   return result;
+}
+
+ma_result cursor_forward(MaComponents* pMa) {
+  return move_cursor(pMa, STEP_SECONDS);
+}
+ma_result cursor_backward(MaComponents* pMa) {
+  return move_cursor(pMa, -STEP_SECONDS);
 }
 
 ma_result set_cursor(MaComponents* pMa, const std::string& time) {
@@ -298,7 +295,7 @@ ma_result get_current_progress(MaComponents* pMa, Progress* currentProgress) {
  * Adjust the volume of the engine, which should be 0.0-1.0.
  * The parameter "diff" indicates the step length.
  */
-ma_result adjust_volume(ma_engine* pEngine, float diff) {
+static ma_result adjust_volume(ma_engine* pEngine, float diff) {
   ma_device* pDevice = ma_engine_get_device(pEngine);
 
   // Get current volume of the engine
@@ -322,16 +319,47 @@ ma_result adjust_volume(ma_engine* pEngine, float diff) {
   return MA_SUCCESS;
 }
 
+ma_result volume_up(ma_engine* pEngine) {
+  return adjust_volume(pEngine, VOLUME_STEP);
+}
+
+ma_result volume_down(ma_engine* pEngine) {
+  return adjust_volume(pEngine, -VOLUME_STEP);
+}
+
+ma_result set_volume(ma_engine* pEngine, const std::string& volumeStr) {
+  // Convert the volume string to float
+  float volume;
+  try {
+    volume = std::stof(volumeStr);
+  } catch (const std::invalid_argument& e) {
+    log(fmt::format("Invalid argument: {}", e.what()), LogType::ERROR);
+    return MA_ERROR;
+  } catch (const std::out_of_range& e) {
+    log(fmt::format("Argument is out of range: {}", e.what()), LogType::ERROR);
+    return MA_ERROR;
+  }
+  volume = volume < 0.0F ? 0.0F : volume > 1.0F ? 1.0F : volume;
+
+  // Set volume
+  ma_device* pDevice = ma_engine_get_device(pEngine);
+  ma_result result = ma_device_set_master_volume(pDevice, volume);
+  if (result != MA_SUCCESS) {
+    // TODO: log
+    return result;
+  }
+  return MA_SUCCESS;
+}
+
 /*
  * Get the volume of the engine and print it as 0-100%
  */
 ma_result get_volume(ma_engine* pEngine, float* volume) {
   ma_device* pDevice = ma_engine_get_device(pEngine);
-
   return ma_device_get_master_volume(pDevice, volume);
 }
 
-ma_result mute_toggle(ma_engine* pEngine) {
+ma_result mute(ma_engine* pEngine) {
   ma_device* pDevice = ma_engine_get_device(pEngine);
 
   float currentVolume = 0.0;
@@ -356,9 +384,42 @@ ma_result mute_toggle(ma_engine* pEngine) {
   return MA_SUCCESS;
 }
 
+void set_random(Config* config) { config->toggle_random(); }
+void set_repetitive(Config* config) { config->toggle_repetitive(); }
+
+std::vector<std::string> get_list(MusicList* musicList) {
+  return musicList->get_list();
+}
+
+static ma_result stop(MaComponents* pMa) {
+  ma_sound* pSound = get_playing_pSound(pMa);
+  if (pSound == nullptr) {
+    // TODO: log
+    return MA_ERROR;
+  }
+
+  ma_result result;
+  result = ma_sound_stop(pSound);
+  if (result != MA_SUCCESS) {
+    // TODO: log
+    return result;
+  }
+  return MA_SUCCESS;
+}
+
 void quit(MaComponents* pMa, QuitControl* quitC) {
   if (stop(pMa) != MA_SUCCESS) {
     log("Failed to stop music", LogType::ERROR);
   }
+  if (pMa->pSound_to_play->is_initialized()) {
+    pMa->pSound_to_play->uninit();
+    log("Unitialized pSound_to_play", LogType::INFO);
+  }
+  if (pMa->pSound_to_register->is_initialized()) {
+    pMa->pSound_to_register->uninit();
+    log("Unitialized pSound_to_register", LogType::INFO);
+  }
   quitC->quit();
 }
+
+}  // namespace Commands

@@ -45,25 +45,26 @@ MaComponents::MaComponents()
 
 MaComponents::~MaComponents() { ma_engine_uninit(pEngine.get()); }
 
-ma_result MaComponents::ma_comp_init_engine() {
+void MaComponents::ma_comp_init_engine() {
   ma_result result = ma_engine_init(nullptr, pEngine.get());
   if (result != MA_SUCCESS) {
     log("Failed to initialize engine", LogType::ERROR);
+    std::exit(FATAL_ERROR);
   }
-  return result;
 }
 
 UserData::UserData(ma_engine* _pEngine, SoundPack* _pSound_to_play,
                    SoundPack* _pSound_to_register, QuitControl* _quitC,
                    MusicList* _musicList, std::string* _musicPlaying,
-                   bool _random)
+                   bool* _random, bool* _repetitive)
     : pEngine(_pEngine),
       pSound_to_play(_pSound_to_play),
       pSound_to_register(_pSound_to_register),
       quitC(_quitC),
       musicList(_musicList),
       musicPlaying(_musicPlaying),
-      random(_random) {}
+      random(_random),
+      repetitive(_repetitive) {}
 
 void QuitControl::signal() {
   std::lock_guard<std::mutex> lock(this->mtx);
@@ -85,7 +86,7 @@ ma_result play_internal(ma_engine* pEngine, SoundPack* pSound_to_play,
                         const std::string& musicToPlay,
                         std::string* musicPlaying, MusicList* musicList,
                         SoundPack* pSound_to_register, QuitControl* quitC,
-                        bool random) {
+                        bool* random, bool* repetitive) {
   *musicPlaying = musicToPlay;
 
   {
@@ -100,7 +101,7 @@ ma_result play_internal(ma_engine* pEngine, SoundPack* pSound_to_play,
     return result;
   }
 
-  if (random) {
+  if (*random) {
     auto music = musicList->random_out();
     if (!music) {
       log(fmt::format("Failed to get random music: {}", musicToPlay),
@@ -111,7 +112,8 @@ ma_result play_internal(ma_engine* pEngine, SoundPack* pSound_to_play,
   }
 
   auto* pUserData(new UserData(pEngine, pSound_to_register, pSound_to_play,
-                               quitC, musicList, musicPlaying, random));
+                               quitC, musicList, musicPlaying, random,
+                               repetitive));
 
   ma_sound_set_end_callback(pSound_to_play->pSound.get(), sound_at_end_callback,
                             pUserData);
@@ -156,13 +158,18 @@ void sound_at_end_callback(void* pUserData, ma_sound* pSound) {
     std::exit(FATAL_ERROR);
   }
   const std::string& musicPlaying = *(pData->musicPlaying);
+
+  if (!*(pData->repetitive)) {
+    pData->musicList->remove(musicPlaying);
+  }
   pData->musicList->tail_in(musicPlaying);
 
   const std::string musicToPlay = pData->musicList->head_out()->get_music();
 
   ma_result result = play_internal(
       pData->pEngine, pData->pSound_to_play, musicToPlay, pData->musicPlaying,
-      pData->musicList, pData->pSound_to_register, pData->quitC, pData->random);
+      pData->musicList, pData->pSound_to_register, pData->quitC, pData->random,
+      pData->repetitive);
   if (result != MA_SUCCESS) {
     log(fmt::format("Failed to play music: {}", musicToPlay), LogType::ERROR);
     std::exit(FATAL_ERROR);

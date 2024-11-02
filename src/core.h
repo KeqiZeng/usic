@@ -27,7 +27,8 @@ class SoundPack {
                                  std::string* musicPlaying,
                                  MusicList* musicList,
                                  SoundPack* pSound_to_register,
-                                 QuitControl* quitC, bool random);
+                                 QuitControl* quitC, bool* random,
+                                 bool* repetitive);
 
  private:
   bool isInitialized{false};
@@ -56,7 +57,7 @@ class MaComponents {
   MaComponents();
   ~MaComponents();
 
-  ma_result ma_comp_init_engine();
+  void ma_comp_init_engine();
 };
 
 class UserData {
@@ -67,11 +68,13 @@ class UserData {
   QuitControl* quitC;
   MusicList* musicList;
   std::string* musicPlaying;
-  bool random;
+  bool* random;
+  bool* repetitive;
 
   UserData(ma_engine* _pEngine, SoundPack* _pSound_to_play,
            SoundPack* _pSound_to_register, QuitControl* _quitC,
-           MusicList* _musicList, std::string* _musicPlaying, bool _random);
+           MusicList* _musicList, std::string* _musicPlaying, bool* _random,
+           bool* _repetitive);
 };
 
 class QuitControl {
@@ -93,7 +96,7 @@ ma_result play_internal(ma_engine* pEngine, SoundPack* pSound_to_play,
                         const std::string& musicToPlay,
                         std::string* musicPlaying, MusicList* musicList,
                         SoundPack* pSound_to_register, QuitControl* quitC,
-                        bool random);
+                        bool* random, bool* repetitive);
 
 void cleanFunc(MaComponents* pMa, QuitControl* quitC);
 void sound_at_end_callback(void* pUserData, ma_sound* pSound);

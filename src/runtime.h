@@ -9,6 +9,12 @@
 #include "fmt/core.h"
 
 #define FATAL_ERROR -1
+
+// for named pipes communication
+#define OVER "OVER"
+#define GOT "GOT"
+#define NO_MESSAGE "NO_MESSAGE"
+
 const std::string RUNTIME_PATH =
     fmt::format("{}/{}", std::getenv("HOME"), ".local/state/usic");
 const std::string ERROR_LOG_FILE =
@@ -20,18 +26,19 @@ const std::string PIPE_TO_SERVER =
 const std::string PIPE_TO_CLIENT =
     fmt::format("{}/{}", RUNTIME_PATH, "pipe_to_client");
 
-enum LogType {
+enum class LogType {
   ERROR,
   INFO,
 };
 
-enum OpenMode {
-  RD_ONLY = O_RDONLY,
-  WR_ONLY = O_WRONLY,
+enum class OpenMode {
+  RD_ONLY_BLOCK = O_RDONLY,
+  WR_ONLY_BLOCK = O_WRONLY,
 };
 
 class NamedPipe {
   const std::string pipePath;
+  OpenMode mode;
   int fd = -1;
 
  public:
@@ -41,6 +48,10 @@ class NamedPipe {
   int setup();
   void open_pipe(OpenMode openMode);
   void close_pipe();
+  void delete_pipe();
+  int get_fd();
+  void writeIn(const std::string& msg);
+  std::string readOut();
 };
 
 class Config {
@@ -54,10 +65,14 @@ class Config {
          const std::string& _playListPath);
   bool is_repetitive();
   bool is_random();
+  bool* get_repetitive_p();
+  bool* get_random_p();
+  void toggle_random();
+  void toggle_repetitive();
   std::string get_usic_library();
   std::string get_playList_path();
 };
 
 bool server_is_running();
-void setup_runtime();
+void setup_runtime(NamedPipe* pipeToServer, NamedPipe* pipeToClient);
 void log(std::string_view message, LogType type);
