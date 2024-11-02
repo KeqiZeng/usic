@@ -75,4 +75,4 @@ class Config {
 
 bool server_is_running();
 void setup_runtime(NamedPipe* pipeToServer, NamedPipe* pipeToClient);
-void log(std::string_view message, LogType type);
+void log(std::string_view message, LogType type, std::string_view funcName);

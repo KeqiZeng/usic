@@ -172,7 +172,7 @@ void setup_runtime(NamedPipe* pipeToServer, NamedPipe* pipeToClient) {
   }
 }
 
-void log(std::string_view message, LogType type) {
+void log(std::string_view message, LogType type, std::string_view funcName) {
   switch (type) {
     case LogType::ERROR:
       std::future<void>{} =

@@ -2,15 +2,17 @@
 
 namespace utils {
 
-void log(std::string_view msg, const std::string& filename) {
+void log(std::string_view msg, std::string_view filename,
+         std::string_view funcName) {
   auto now = std::chrono::system_clock::now();
   auto now_time_t = std::chrono::system_clock::to_time_t(now);
   auto localTime = *std::localtime(&now_time_t);
-  auto logMessage = fmt::format("[{:%Y-%m-%d %H:%M:%S}] {}", localTime, msg);
+  auto logMessage =
+      fmt::format("[{:%Y-%m-%d %H:%M:%S}] {}: {}\n", localTime, funcName, msg);
 
   auto logFile = fmt::output_file(
-      filename, fmt::file::RDWR | fmt::file::CREATE | fmt::file::APPEND);
-  logFile.print("{}\n", logMessage);
+      filename.data(), fmt::file::RDWR | fmt::file::CREATE | fmt::file::APPEND);
+  logFile.print("{}", logMessage);
   logFile.close();
 }
 

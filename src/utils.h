@@ -10,7 +10,8 @@
 #define SECONDS_PER_MINUTE 60
 namespace utils {
 
-void log(std::string_view msg, const std::string& filename);
+void log(std::string_view msg, std::string_view filename,
+         std::string_view funcName);
 int timeStr_to_sec(const std::string& timeStr);
 std::string sec_to_timeStr(int seconds);
 
