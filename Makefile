@@ -2,14 +2,14 @@
 
 PROJECT_NAME = usic
 
-.PHONY: build_debug build_release run test install clean
+.PHONY: debug release run test install clean
 
-build_debug:
+debug:
 	@cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
 	@cp ./build/compile_commands.json .
-	@cmake --build build
+	@cmake --build build && echo "\n[32m========== output ==========[0m\n" && ./build/${PROJECT_NAME}
 
-build_release:
+release:
 	@cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 	@cp ./build/compile_commands.json .
 	@cmake --build build
