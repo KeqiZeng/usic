@@ -32,7 +32,7 @@ int main(int argc, char* argv[]) {
     pid_t pid = fork();
     if (pid < 0) {
       // Forking failed
-      log("Forking child process failed", LogType::ERROR);
+      log("forking child process failed", LogType::ERROR, __func__);
       return 1;
     }
     if (pid > 0) {

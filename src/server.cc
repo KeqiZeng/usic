@@ -26,7 +26,7 @@ void sendMsgToClient(const std::string& msg, NamedPipe* pipeToServer,
 void sendMsgToClient(const std::vector<std::string>* msg,
                      NamedPipe* pipeToServer, NamedPipe* pipeToClient) {
   if (msg->size() == 0) {
-    log("Empty message", LogType::ERROR);
+    log("got an empty message", LogType::ERROR, __func__);
     return;
   }
   pipeToServer->open_pipe(OpenMode::RD_ONLY_BLOCK);
@@ -75,7 +75,7 @@ static std::vector<std::string> parse_command(std::string& cmd) {
 static void logErrorAndSendToClient(const std::string& err,
                                     NamedPipe* pipeToServer,
                                     NamedPipe* pipeToClient) {
-  log(err, LogType::ERROR);
+  log(err, LogType::ERROR, __func__);
   sendMsgToClient(err, pipeToServer, pipeToClient);
 }
 
@@ -305,7 +305,9 @@ void server() {
       fmt::format("{}{}", config->get_playList_path(), DEFAULT_PLAY_LIST));
 
   if (musicList->is_empty()) {
-    log("Failed to load music list", LogType::ERROR);
+    log(fmt::format("failed to load music list {}{}",
+                    config->get_playList_path(), DEFAULT_PLAY_LIST),
+        LogType::ERROR, __func__);
     std::exit(FATAL_ERROR);
   }
 
@@ -321,7 +323,7 @@ void server() {
     args.clear();
     cmd = get_command(pipeToServer.get(), pipeToClient.get());
     if (cmd == "") {
-      log("Failed to get command", LogType::ERROR);
+      log("failed to get command", LogType::ERROR, __func__);
       continue;
     }
 

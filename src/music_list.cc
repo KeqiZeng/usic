@@ -23,7 +23,8 @@ MusicList::MusicList(Config* config, const std::string& listFile) {
     }
     file.close();
   } else {
-    log(fmt::format("Failed to open file: {}", listFile), LogType::ERROR);
+    log(fmt::format("Failed to open file: {}", listFile), LogType::ERROR,
+        __func__);
   }
 }
 MusicList::~MusicList() {
@@ -50,7 +51,8 @@ void MusicList::load(const std::string& listPath, Config* config, bool reload) {
     }
     file.close();
   } else {
-    log(fmt::format("Failed to open file: {}", listPath), LogType::ERROR);
+    log(fmt::format("Failed to open file: {}", listPath), LogType::ERROR,
+        __func__);
   }
 }
 

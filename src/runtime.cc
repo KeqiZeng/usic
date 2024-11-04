@@ -11,26 +11,27 @@ int NamedPipe::setup() {
   if (access(this->pipePath.data(), F_OK) != -1) {
     // if named pipe exists, delete it for initialization
     if (unlink(this->pipePath.data()) == -1) {
-      log(fmt::format("Failed to delete named pipe {}", this->pipePath),
-          LogType::ERROR);
+      log(fmt::format("failed to delete named pipe {}", this->pipePath),
+          LogType::ERROR, __func__);
       return FATAL_ERROR;
     }
   }
 
   if (mkfifo(this->pipePath.data(), 0666)) {
-    log(fmt::format("Failed to create named pipe {}", this->pipePath),
-        LogType::ERROR);
+    log(fmt::format("failed to create named pipe {}", this->pipePath),
+        LogType::ERROR, __func__);
     return FATAL_ERROR;
   }
-  log(fmt::format("Created named pipe {}", this->pipePath), LogType::INFO);
+  log(fmt::format("created named pipe {}", this->pipePath), LogType::INFO,
+      __func__);
   return 0;
 }
 
 void NamedPipe::open_pipe(OpenMode openMode) {
   this->fd = open(this->pipePath.data(), static_cast<int>(openMode));
   if (this->fd == -1) {
-    log(fmt::format("Failed to open named pipe {}", this->pipePath),
-        LogType::ERROR);
+    log(fmt::format("failed to open named pipe {}", this->pipePath),
+        LogType::ERROR, __func__);
     std::exit(FATAL_ERROR);
   }
   this->mode = openMode;
@@ -42,37 +43,38 @@ void NamedPipe::close_pipe() {
 
 void NamedPipe::delete_pipe() {
   unlink(this->pipePath.data());
-  log(fmt::format("Deleted named pipe {}", this->pipePath), LogType::INFO);
+  log(fmt::format("deleted named pipe {}", this->pipePath), LogType::INFO,
+      __func__);
 }
 
 int NamedPipe::get_fd() { return this->fd; }
 
 void NamedPipe::writeIn(const std::string& msg) {
   if (this->mode != OpenMode::WR_ONLY_BLOCK) {
-    log(fmt::format("Named pipe {} is not writable", this->pipePath),
-        LogType::ERROR);
+    log(fmt::format("named pipe {} is not writable", this->pipePath),
+        LogType::ERROR, __func__);
     return;
   }
 
   ssize_t bytesWritten = write(this->fd, msg.data(), msg.size());
   if (bytesWritten == -1) {
-    log(fmt::format("Failed to write to named pipe {}", this->pipePath),
-        LogType::ERROR);
+    log(fmt::format("failed to write to named pipe {}", this->pipePath),
+        LogType::ERROR, __func__);
   }
 }
 
 std::string NamedPipe::readOut() {
   if (this->mode != OpenMode::RD_ONLY_BLOCK) {
-    log(fmt::format("Named pipe {} is not readable", this->pipePath),
-        LogType::ERROR);
+    log(fmt::format("named pipe {} is not readable", this->pipePath),
+        LogType::ERROR, __func__);
     return "";
   }
   std::string msg;
   msg.resize(1024);
   ssize_t bytesRead = read(this->fd, msg.data(), 1024);
   if (bytesRead == -1) {
-    log(fmt::format("Failed to read from named pipe {}", this->pipePath),
-        LogType::ERROR);
+    log(fmt::format("failed to read from named pipe {}", this->pipePath),
+        LogType::ERROR, __func__);
   } else {
     msg.resize(bytesRead);
   }
@@ -83,7 +85,7 @@ Config::Config(bool _repetitive, bool _random, const std::string& _usicLibrary,
                const std::string& _playListPath)
     : repetitive(_repetitive), random(_random) {
   if (_usicLibrary.empty()) {
-    log("usicLibrary can not be empty", LogType::ERROR);
+    log("usicLibrary can not be empty", LogType::ERROR, __func__);
     std::exit(FATAL_ERROR);
   }
   if (_usicLibrary.back() != '/') {
@@ -93,7 +95,8 @@ Config::Config(bool _repetitive, bool _random, const std::string& _usicLibrary,
   }
 
   if (_playListPath.empty()) {
-    log("playListPath is empty, use USIC_LIBARY as default", LogType::INFO);
+    log("playListPath is empty, use USIC_LIBARY as default", LogType::INFO,
+        __func__);
     this->playListPath = this->usicLibrary;
   }
   if (_playListPath.back() != '/') {
@@ -117,7 +120,7 @@ bool server_is_running() {
   // Execute ps command and read its output
   FILE* fp = popen("/bin/ps -e -o comm=", "r");
   if (fp == nullptr) {
-    log("Failed to execute ps command", LogType::ERROR);
+    log("failed to execute ps command", LogType::ERROR, __func__);
     std::exit(FATAL_ERROR);
   }
 
@@ -157,17 +160,17 @@ void setup_runtime(NamedPipe* pipeToServer, NamedPipe* pipeToClient) {
 
   // setup named pipes
   if (pipeToServer == nullptr || pipeToClient == nullptr) {
-    log("Failed to setup named pipes, pipeToServer or pipeToClient is nullptr",
-        LogType::ERROR);
+    log("failed to setup named pipes, pipeToServer or pipeToClient is nullptr",
+        LogType::ERROR, __func__);
     std::exit(FATAL_ERROR);
   }
 
   if (pipeToServer->setup() == FATAL_ERROR) {
-    log("Failed to setup pipeToServer", LogType::ERROR);
+    log("failed to setup pipeToServer", LogType::ERROR, __func__);
     std::exit(FATAL_ERROR);
   }
   if (pipeToClient->setup() == FATAL_ERROR) {
-    log("Failed to setup pipeToClient", LogType::ERROR);
+    log("failed to setup pipeToClient", LogType::ERROR, __func__);
     std::exit(FATAL_ERROR);
   }
 }
@@ -175,12 +178,12 @@ void setup_runtime(NamedPipe* pipeToServer, NamedPipe* pipeToClient) {
 void log(std::string_view message, LogType type, std::string_view funcName) {
   switch (type) {
     case LogType::ERROR:
-      std::future<void>{} =
-          std::async(std::launch::async, utils::log, message, ERROR_LOG_FILE);
+      std::future<void>{} = std::async(std::launch::async, utils::log, message,
+                                       ERROR_LOG_FILE, funcName);
       break;
     case LogType::INFO:
-      std::future<void>{} =
-          std::async(std::launch::async, utils::log, message, INFO_LOG_FILE);
+      std::future<void>{} = std::async(std::launch::async, utils::log, message,
+                                       INFO_LOG_FILE, funcName);
       break;
   }
 }

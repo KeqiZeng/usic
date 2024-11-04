@@ -10,7 +10,7 @@ ma_result SoundPack::init(ma_engine* pEngine, const std::string& pFilePath,
                           ma_uint32 flags) {
   std::lock_guard<std::mutex> lock(this->mtx);
   if (this->isInitialized) {
-    log("Can not init sound twice", LogType::ERROR);
+    log("can not init sound twice", LogType::ERROR, __func__);
     return MA_ERROR;
   }
   if (!this->pSound) {
@@ -31,7 +31,7 @@ void SoundPack::uninit() {
     ma_sound_uninit(this->pSound.get());
     this->isInitialized = false;
     this->isPlaying = false;
-    log("uninit sound", LogType::INFO);
+    log("uninit sound", LogType::INFO, __func__);
   }
 }
 
@@ -48,7 +48,7 @@ MaComponents::~MaComponents() { ma_engine_uninit(pEngine.get()); }
 void MaComponents::ma_comp_init_engine() {
   ma_result result = ma_engine_init(nullptr, pEngine.get());
   if (result != MA_SUCCESS) {
-    log("Failed to initialize engine", LogType::ERROR);
+    log("failed to initialize engine", LogType::ERROR, __func__);
     std::exit(FATAL_ERROR);
   }
 }
@@ -96,16 +96,16 @@ ma_result play_internal(ma_engine* pEngine, SoundPack* pSound_to_play,
 
   ma_result result = pSound_to_play->init(pEngine, musicToPlay, LOADING_FLAGS);
   if (result != MA_SUCCESS) {
-    log(fmt::format("Failed to initialize sound from file: {}", musicToPlay),
-        LogType::ERROR);
+    log(fmt::format("failed to initialize sound from file: {}", musicToPlay),
+        LogType::ERROR, __func__);
     return result;
   }
 
   if (*random) {
     auto music = musicList->random_out();
     if (!music) {
-      log(fmt::format("Failed to get random music: {}", musicToPlay),
-          LogType::ERROR);
+      log(fmt::format("failed to get random music: {}", musicToPlay),
+          LogType::ERROR, __func__);
       return MA_ERROR;
     }
     musicList->head_in(music->get_music());
@@ -119,14 +119,15 @@ ma_result play_internal(ma_engine* pEngine, SoundPack* pSound_to_play,
                             pUserData);
   result = ma_sound_start(pSound_to_play->pSound.get());
   if (result != MA_SUCCESS) {
-    log(fmt::format("Failed to start sound: {}", musicToPlay), LogType::ERROR);
+    log(fmt::format("failed to start sound: {}", musicToPlay), LogType::ERROR,
+        __func__);
     return result;
   }
   {
     std::lock_guard<std::mutex> lock(pSound_to_play->mtx);
     pSound_to_play->isPlaying = true;
   }
-  log(fmt::format("{} started", musicToPlay), LogType::INFO);
+  log(fmt::format("started playing: {}", musicToPlay), LogType::INFO, __func__);
   return MA_SUCCESS;
 }
 
@@ -136,7 +137,7 @@ void cleanFunc(MaComponents* pMa, QuitControl* quitC) {
     quitC->cv.wait(
         lock, [quitC] { return quitC->at_end() || quitC->get_quit_flag(); });
     if (quitC->get_quit_flag()) {
-      log("Cleaner quit", LogType::INFO);
+      log("cleaner quit", LogType::INFO, __func__);
       return;
     }
     if (!pMa->pSound_to_play->is_playing() &&
@@ -154,7 +155,7 @@ void cleanFunc(MaComponents* pMa, QuitControl* quitC) {
 void sound_at_end_callback(void* pUserData, ma_sound* pSound) {
   auto* pData = static_cast<UserData*>(pUserData);
   if (!pData) {
-    log("Invalid user data in sound_at_end_callback", LogType::ERROR);
+    log("got an invalid pUserData", LogType::ERROR, __func__);
     std::exit(FATAL_ERROR);
   }
   const std::string& musicPlaying = *(pData->musicPlaying);
@@ -171,7 +172,8 @@ void sound_at_end_callback(void* pUserData, ma_sound* pSound) {
       pData->musicList, pData->pSound_to_register, pData->quitC, pData->random,
       pData->repetitive);
   if (result != MA_SUCCESS) {
-    log(fmt::format("Failed to play music: {}", musicToPlay), LogType::ERROR);
+    log(fmt::format("failed to play music: {}", musicToPlay), LogType::ERROR,
+        __func__);
     std::exit(FATAL_ERROR);
   }
   pData->quitC->signal();
@@ -183,10 +185,9 @@ void sound_init_notification_callback(ma_async_notification* pNotification) {
       static_cast<SoundInitNotification*>(pNotification);
   auto* pMyData = static_cast<SoundPack*>(pSoundInitNotification->pMyData);
   if (!pMyData) {
-    log("Invalid user data in sound_init_notification_callback",
-        LogType::ERROR);
+    log("got an invalid pMyData", LogType::ERROR, __func__);
     std::exit(FATAL_ERROR);
   }
   pMyData->isInitialized = true;
-  log("Sound initialized", LogType::INFO);
+  log("sound initialized", LogType::INFO, __func__);
 }
