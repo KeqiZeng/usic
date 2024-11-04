@@ -9,11 +9,7 @@
 #include "fmt/core.h"
 
 #define FATAL_ERROR -1
-
-// for named pipes communication
-#define OVER "OVER"
-#define GOT "GOT"
-#define NO_MESSAGE "NO_MESSAGE"
+#define VERSION "0.0.1"
 
 const std::string RUNTIME_PATH =
     fmt::format("{}/{}", std::getenv("HOME"), ".local/state/usic");
@@ -26,6 +22,43 @@ const std::string PIPE_TO_SERVER =
 const std::string PIPE_TO_CLIENT =
     fmt::format("{}/{}", RUNTIME_PATH, "pipe_to_client");
 
+const std::string DOC =
+    "USIC DOCUMENT:\n"
+    "Server:\n"
+    "  usic [FLAGS]\n"
+    "  usic                Run server\n"
+    "FLAGS:\n"
+    "  -h, --help          Print this document\n"
+    "  -v, --version       Print version\n"
+    "\n"
+    "Client:\n"
+    "  usic <COMMAND> [ARGUMENT]\n"
+    "COMMAND:\n"
+    "  load                  Load playlist                REQUIRED ARGUMENT: "
+    "The path of playlist file\n"
+    "  play                  Play music                   OPTIONAL ARGUMENT: "
+    "The path of music file; plays first in playlist if not provided\n"
+    "  play_later            Play given music next        REQUIRED ARGUMENT: "
+    "The path of music file\n"
+    "  play_next             Play next music in playlist  NO ARGUMENT\n"
+    "  play_prev             Play previous music          NO ARGUMENT\n"
+    "  pause                 Pause or resume music        NO ARGUMENT\n"
+    "  cursor_forward        Move cursor forward          NO ARGUMENT\n"
+    "  cursor_backward       Move cursor backward         NO ARGUMENT\n"
+    "  set_cursor            Set cursor to given time     REQUIRED ARGUMENT: "
+    "Time in MM:SS format\n"
+    "  get_current_progress  Get current progress         NO ARGUMENT\n"
+    "  volume_up             Increase volume              NO ARGUMENT\n"
+    "  volume_down           Decrease volume              NO ARGUMENT\n"
+    "  set_volume            Set volume                   REQUIRED ARGUMENT: "
+    "Volume between 0.0 and 1.0\n"
+    "  get_volume            Get current volume           NO ARGUMENT\n"
+    "  mute                  Mute or unmute volume        NO ARGUMENT\n"
+    "  set_random            Toggle random mode           NO ARGUMENT\n"
+    "  set_repetitive        Toggle repetitive mode       NO ARGUMENT\n"
+    "  list                  Print playlist               NO ARGUMENT\n"
+    "  quit                  Quit server                  NO ARGUMENT\n";
+
 enum class LogType {
   ERROR,
   INFO,
@@ -35,6 +68,11 @@ enum class OpenMode {
   RD_ONLY_BLOCK = O_RDONLY,
   WR_ONLY_BLOCK = O_WRONLY,
 };
+
+// for named pipes communication
+#define OVER "OVER"
+#define GOT "GOT"
+#define NO_MESSAGE "NO_MESSAGE"
 
 class NamedPipe {
   const std::string pipePath;

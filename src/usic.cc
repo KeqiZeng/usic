@@ -46,9 +46,13 @@ int main(int argc, char* argv[]) {
     return 0;
   }
   if (argc > 1) {
+    if (strcmp(argv[1], "-v") == 0 || strcmp(argv[1], "--version") == 0) {
+      fmt::print("{}\n", VERSION);
+      return 0;
+    }
+
     if (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0) {
-      // TODO: print help
-      fmt::print("Usage: usic [options]\n");
+      fmt::print("{}", DOC);
       return 0;
     }
 
