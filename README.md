@@ -7,6 +7,7 @@
 /_/
 
 ```
-![GitHub file size in bytes](https://img.shields.io/github/size/KeqiZeng/usic/usic?color=green&label=usic&logo=usic%20size&style=flat-square)
+
+![GitHub file size in bytes](https://img.shields.io/github/size/KeqiZeng/usic/usic?style=flat&color=%23a6e3a1)
 
 ## This project is in development
