@@ -79,7 +79,6 @@ void play_later(Config* config, const std::string& music,
 ma_result play_next(MaComponents* pMa) {
   ma_sound* pSound = get_playing_pSound(pMa);
   if (pSound == nullptr) {
-    // TODO: log
     log("failed to get playing pSound", LogType::ERROR, __func__);
     return MA_ERROR;
   }
@@ -122,7 +121,7 @@ ma_result play_prev(MaComponents* pMa, MusicList* musicList) {
 ma_result pause_resume(MaComponents* pMa) {
   ma_sound* pSound = get_playing_pSound(pMa);
   if (pSound == nullptr) {
-    // TODO: log
+    log("failed to get playing pSound", LogType::ERROR, __func__);
     return MA_ERROR;
   }
 
@@ -131,14 +130,14 @@ ma_result pause_resume(MaComponents* pMa) {
     // if is_playing, pause
     result = ma_sound_stop(pSound);
     if (result != MA_SUCCESS) {
-      // TODO: log
+      log("failed to stop the playing sound", LogType::ERROR, __func__);
       return result;
     }
   } else {
     // else resume
     result = ma_sound_start(pSound);
     if (result != MA_SUCCESS) {
-      // TODO: log
+      log("failed to start the stopped sound", LogType::ERROR, __func__);
       return result;
     }
   }
@@ -148,7 +147,7 @@ ma_result pause_resume(MaComponents* pMa) {
 static ma_result move_cursor(MaComponents* pMa, int seconds) {
   ma_sound* pSound = get_playing_pSound(pMa);
   if (pSound == nullptr) {
-    // TODO: log
+    log("failed to get playing pSound", LogType::ERROR, __func__);
     return MA_ERROR;
   }
 
@@ -157,12 +156,12 @@ static ma_result move_cursor(MaComponents* pMa, int seconds) {
   ma_uint64 length = 0;
   ma_result result = ma_sound_get_cursor_in_pcm_frames(pSound, &cursor);
   if (result != MA_SUCCESS) {
-    // TODO: log
+    log("failed to get cursor in pcm frames", LogType::ERROR, __func__);
     return result;
   }
   result = ma_sound_get_length_in_pcm_frames(pSound, &length);
   if (result != MA_SUCCESS) {
-    // TODO: log
+    log("failed to get length in pcm frames", LogType::ERROR, __func__);
     return result;
   }
 
@@ -182,7 +181,7 @@ static ma_result move_cursor(MaComponents* pMa, int seconds) {
   // Move cursor
   result = ma_sound_seek_to_pcm_frame(pSound, movedCursor);
   if (result != MA_SUCCESS) {
-    // TODO: log
+    log("failed to seek to pcm frame", LogType::ERROR, __func__);
     return result;
   }
   return result;
@@ -198,7 +197,7 @@ ma_result cursor_backward(MaComponents* pMa) {
 ma_result set_cursor(MaComponents* pMa, const std::string& time) {
   ma_sound* pSound = get_playing_pSound(pMa);
   if (pSound == nullptr) {
-    // TODO: log
+    log("failed to get playing pSound", LogType::ERROR, __func__);
     return MA_ERROR;
   }
 
@@ -226,7 +225,7 @@ ma_result set_cursor(MaComponents* pMa, const std::string& time) {
       pSound, (ma_engine_get_sample_rate(pMa->pEngine.get()) * destination));
 
   if (result != MA_SUCCESS) {
-    // TODO: log
+    log("failed to seek to pcm frame", LogType::ERROR, __func__);
     return result;
   }
   return result;
@@ -235,7 +234,7 @@ ma_result set_cursor(MaComponents* pMa, const std::string& time) {
 ma_result get_current_progress(MaComponents* pMa, Progress* currentProgress) {
   ma_sound* pSound = get_playing_pSound(pMa);
   if (pSound == nullptr) {
-    // TODO: log
+    log("failed to get playing pSound", LogType::ERROR, __func__);
     return MA_ERROR;
   }
 
@@ -251,7 +250,7 @@ ma_result get_current_progress(MaComponents* pMa, Progress* currentProgress) {
   // Get the duration of the sound
   result = ma_sound_get_length_in_seconds(pSound, &duration);
   if (result != MA_SUCCESS) {
-    // TODO: log
+    log("failed to get length in seconds", LogType::ERROR, __func__);
     return result;
   }
 
@@ -278,12 +277,7 @@ ma_result get_current_progress(MaComponents* pMa, Progress* currentProgress) {
   }
 
   std::string _str = fmt::format("{}/{}", cursorStr, durationStr);
-  if (!_str.empty()) {
-    currentProgress->init(_str, cursor / duration);
-  } else {
-    // TODO: log
-    return MA_ERROR;
-  }
+  currentProgress->init(_str, cursor / duration);
   return result;
 }
 
@@ -298,7 +292,7 @@ static ma_result adjust_volume(ma_engine* pEngine, float diff) {
   float currentVolume = 0.0;
   ma_result result = ma_device_get_master_volume(pDevice, &currentVolume);
   if (result != MA_SUCCESS) {
-    // TODO: log
+    log("failed to get master volume", LogType::ERROR, __func__);
     return result;
   }
 
@@ -309,7 +303,7 @@ static ma_result adjust_volume(ma_engine* pEngine, float diff) {
   // Set volume
   result = ma_device_set_master_volume(pDevice, newVolume);
   if (result != MA_SUCCESS) {
-    // TODO: log
+    log("failed to set master volume", LogType::ERROR, __func__);
     return result;
   }
   return MA_SUCCESS;
@@ -343,7 +337,7 @@ ma_result set_volume(ma_engine* pEngine, const std::string& volumeStr) {
   ma_device* pDevice = ma_engine_get_device(pEngine);
   ma_result result = ma_device_set_master_volume(pDevice, volume);
   if (result != MA_SUCCESS) {
-    // TODO: log
+    log("failed to set master volume", LogType::ERROR, __func__);
     return result;
   }
   return MA_SUCCESS;
@@ -363,19 +357,19 @@ ma_result mute(ma_engine* pEngine) {
   float currentVolume = 0.0;
   ma_result result = ma_device_get_master_volume(pDevice, &currentVolume);
   if (result != MA_SUCCESS) {
-    // TODO: log
+    log("failed to get master volume", LogType::ERROR, __func__);
     return result;
   }
   if (currentVolume == 0.0F) {
     result = ma_device_set_master_volume(pDevice, 1.0F);
     if (result != MA_SUCCESS) {
-      // TODO: log
+      log("failed to set master volume", LogType::ERROR, __func__);
       return result;
     }
   } else {
     result = ma_device_set_master_volume(pDevice, 0.0F);
     if (result != MA_SUCCESS) {
-      // TODO: log
+      log("failed to set master volume", LogType::ERROR, __func__);
       return result;
     }
   }
@@ -392,14 +386,14 @@ std::vector<std::string> get_list(MusicList* musicList) {
 static ma_result stop(MaComponents* pMa) {
   ma_sound* pSound = get_playing_pSound(pMa);
   if (pSound == nullptr) {
-    // TODO: log
+    log("failed to get playing pSound", LogType::ERROR, __func__);
     return MA_ERROR;
   }
 
   ma_result result;
   result = ma_sound_stop(pSound);
   if (result != MA_SUCCESS) {
-    // TODO: log
+    log("failed to stop the playing sound", LogType::ERROR, __func__);
     return result;
   }
   return MA_SUCCESS;
