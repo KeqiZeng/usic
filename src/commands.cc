@@ -118,7 +118,7 @@ ma_result play_prev(MaComponents* pMa, MusicList* musicList) {
   return play_next(pMa);
 }
 
-ma_result pause_resume(MaComponents* pMa) {
+ma_result pause(MaComponents* pMa) {
   ma_sound* pSound = get_playing_pSound(pMa);
   if (pSound == nullptr) {
     log("failed to get playing pSound", LogType::ERROR, __func__);
@@ -379,7 +379,7 @@ ma_result mute(ma_engine* pEngine) {
 void set_random(Config* config) { config->toggle_random(); }
 void set_repetitive(Config* config) { config->toggle_repetitive(); }
 
-std::vector<std::string> get_list(MusicList* musicList) {
+std::vector<std::string> list(MusicList* musicList) {
   return musicList->get_list();
 }
 

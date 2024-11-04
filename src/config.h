@@ -30,7 +30,7 @@ const std::string DEFAULT_PLAY_LIST = "Default.txt";
 #define PLAY_LATER "play_later"
 #define PLAY_NEXT "play_next"
 #define PLAY_PREV "play_prev"
-#define PAUSE_RESUME "pause_resume"
+#define PAUSE "pause"
 #define CURSOR_FORWARD "cursor_forward"
 #define CURSOR_BACKWARD "cursor_backward"
 #define SET_CURSOR "set_cursor"
@@ -42,7 +42,7 @@ const std::string DEFAULT_PLAY_LIST = "Default.txt";
 #define MUTE "mute"
 #define SET_RANDOM "set_random"
 #define SET_REPETITIVE "set_repetitive"
-#define GET_LIST "get_list"
+#define LIST "list"
 #define QUIT "quit"
 
 const std::unordered_map<std::string, std::vector<std::string>> COMMANDS = {
@@ -51,7 +51,7 @@ const std::unordered_map<std::string, std::vector<std::string>> COMMANDS = {
     {PLAY_LATER, {"pl", "later"}},
     {PLAY_NEXT, {"pn", "next"}},
     {PLAY_PREV, {"pp", "prev"}},
-    {PAUSE_RESUME, {"pr"}},
+    {PAUSE, {"ps"}},
     {CURSOR_FORWARD, {"cf", "forward"}},
     {CURSOR_BACKWARD, {"cb", "backward"}},
     {SET_CURSOR, {"sc", "cursor"}},
@@ -63,5 +63,5 @@ const std::unordered_map<std::string, std::vector<std::string>> COMMANDS = {
     {MUTE, {"m"}},
     {SET_RANDOM, {"sr", "random"}},
     {SET_REPETITIVE, {"sp", "repetitive"}},
-    {GET_LIST, {"list", "ls"}},
+    {LIST, {"ls"}},
     {QUIT, {"q"}}};

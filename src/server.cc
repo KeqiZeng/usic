@@ -108,7 +108,7 @@ void handle_command(std::string& cmd, NamedPipe* pipeToServer,
         sendMsgToClient(NO_MESSAGE, pipeToServer, pipeToClient);
       }
     } else {
-      const std::string& musicToPlay = musicList->random_out()->get_music();
+      const std::string& musicToPlay = musicList->head_out()->get_music();
       ma_result result = Commands::play(pMa, musicToPlay, musicPlaying,
                                         musicList, quitC, config);
       if (result != MA_SUCCESS) {
@@ -151,10 +151,9 @@ void handle_command(std::string& cmd, NamedPipe* pipeToServer,
     } else {
       sendMsgToClient(NO_MESSAGE, pipeToServer, pipeToClient);
     }
-  } else if (subCmd == PAUSE_RESUME ||
-             std::ranges::find(COMMANDS.at(PAUSE_RESUME), subCmd) !=
-                 COMMANDS.at(PAUSE_RESUME).end()) {
-    ma_result result = Commands::pause_resume(pMa);
+  } else if (subCmd == PAUSE || std::ranges::find(COMMANDS.at(PAUSE), subCmd) !=
+                                    COMMANDS.at(PAUSE).end()) {
+    ma_result result = Commands::pause(pMa);
     if (result != MA_SUCCESS) {
       logErrorAndSendToClient("Failed to pause/resume music", pipeToServer,
                               pipeToClient);
@@ -277,10 +276,9 @@ void handle_command(std::string& cmd, NamedPipe* pipeToServer,
         fmt::format("repetitive: {}",
                     config->is_repetitive() ? "enabled" : "disabled"),
         pipeToServer, pipeToClient);
-  } else if (subCmd == GET_LIST ||
-             std::ranges::find(COMMANDS.at(GET_LIST), subCmd) !=
-                 COMMANDS.at(GET_LIST).end()) {
-    std::vector<std::string> list = Commands::get_list(musicList);
+  } else if (subCmd == LIST || std::ranges::find(COMMANDS.at(LIST), subCmd) !=
+                                   COMMANDS.at(LIST).end()) {
+    std::vector<std::string> list = Commands::list(musicList);
     sendMsgToClient(&list, pipeToServer, pipeToClient);
   } else if (subCmd == QUIT || std::ranges::find(COMMANDS.at(QUIT), subCmd) !=
                                    COMMANDS.at(QUIT).end()) {

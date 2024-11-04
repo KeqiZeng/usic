@@ -27,7 +27,7 @@ void play_later(Config* config, const std::string& music,
                 MusicList* music_list);
 ma_result play_next(MaComponents* pMa);
 ma_result play_prev(MaComponents* pMa, MusicList* musicList);
-ma_result pause_resume(MaComponents* pMa);
+ma_result pause(MaComponents* pMa);
 ma_result cursor_forward(MaComponents* pMa);
 ma_result cursor_backward(MaComponents* pMa);
 ma_result set_cursor(MaComponents* pMa, const std::string& time);
@@ -39,7 +39,7 @@ ma_result get_volume(ma_engine* pEngine, float* volume);
 ma_result mute(ma_engine* pEngine);
 void set_random(Config* config);
 void set_repetitive(Config* config);
-std::vector<std::string> get_list(MusicList* musicList);
+std::vector<std::string> list(MusicList* musicList);
 void quit(MaComponents* pMa, QuitControl* quitC);
 
 }  // namespace Commands
