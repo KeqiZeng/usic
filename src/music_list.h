@@ -1,48 +1,48 @@
 #pragma once
-#include <fstream>
 #include <string>
 #include <vector>
 
-#include "fmt/core.h"
 #include "runtime.h"
 
-class MusicNode {
-  friend class MusicList;
+class MusicNode
+{
+  public:
+    MusicNode() = default;
+    MusicNode(std::string_view music);
+    // ~MusicNode() = default;
 
- private:
-  const std::string music;
-  std::shared_ptr<MusicNode> prev{nullptr};
-  std::shared_ptr<MusicNode> next{nullptr};
+    [[nodiscard]] const std::string getMusic() const;
 
- public:
-  MusicNode() = default;
-  MusicNode(std::string _music);
-  // ~MusicNode() = default;
+  private:
+    const std::string music_;
+    std::shared_ptr<MusicNode> prev_{nullptr};
+    std::shared_ptr<MusicNode> next_{nullptr};
 
-  [[nodiscard]] const std::string get_music() const;
+    friend class MusicList;
 };
 
-class MusicList {
- private:
-  std::shared_ptr<MusicNode> head{nullptr};
-  std::shared_ptr<MusicNode> tail{nullptr};
-  int count{0};
+class MusicList
+{
+  public:
+    MusicList() = default;
+    MusicList(Config* config, std::string_view list_file);
+    ~MusicList();
 
- public:
-  MusicList() = default;
-  MusicList(Config* config, const std::string& listFile);
-  ~MusicList();
+    void load(std::string_view list_path, Config* config, bool reload = true);
+    [[nodiscard]] bool isEmpty() const;
+    [[nodiscard]] int getCount() const;
+    [[nodiscard]] std::vector<std::string> getList();
+    void tailIn(std::string_view music);
+    std::shared_ptr<MusicNode> headOut();
+    std::shared_ptr<MusicNode> tailOut();
+    void headIn(std::string_view music);
+    std::shared_ptr<MusicNode> randomOut();
+    bool contain(std::string_view music);
+    bool remove(std::string_view music);
+    void clear();
 
-  void load(const std::string& listPath, Config* config, bool reload = true);
-  [[nodiscard]] bool is_empty() const;
-  [[nodiscard]] int get_count() const;
-  [[nodiscard]] std::vector<std::string> get_list();
-  void tail_in(const std::string& music);
-  std::shared_ptr<MusicNode> head_out();
-  std::shared_ptr<MusicNode> tail_out();
-  void head_in(const std::string& music);
-  std::shared_ptr<MusicNode> random_out();
-  bool contain(const std::string& music);
-  bool remove(const std::string& music);
-  void clear();
+  private:
+    std::shared_ptr<MusicNode> head_{nullptr};
+    std::shared_ptr<MusicNode> tail_{nullptr};
+    int count_{0};
 };

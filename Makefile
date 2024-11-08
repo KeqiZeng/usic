@@ -6,12 +6,10 @@ PROJECT_NAME = usic
 
 run:
 	@cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
-	@cp ./build/compile_commands.json .
 	@cmake --build build && echo "\n[32m========== output ==========[0m\n" && ./build/${PROJECT_NAME}
 
 release:
 	@cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-	@cp ./build/compile_commands.json .
 	@cmake --build build
 
 test:
@@ -24,8 +22,8 @@ install:
 	@echo "\033[32m${PROJECT_NAME} has been installed into /usr/local/bin\033[0m"
 
 uninstall:
-	@rm -f /usr/local/bin/{project_name}
-	@echo "\033[32m{project_name} has been uninstalled from /usr/local/bin\033[0m"
+	@rm -f /usr/local/bin/${PROJECT_NAME}
+	@echo "\033[32m{PROJECT_NAME} has been uninstalled from /usr/local/bin\033[0m"
 
 with_script:
 	@cp ./scripts/usic_play_list.sh /usr/local/bin/usic_play_list

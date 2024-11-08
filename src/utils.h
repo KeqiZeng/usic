@@ -1,18 +1,15 @@
 #pragma once
 
-#include <chrono>
+#include <optional>
 #include <string>
+#include <string_view>
 
-#include "fmt/chrono.h"
-#include "fmt/core.h"
-#include "fmt/os.h"
+const int SECONDS_PER_MINUTE = 60;
+namespace utils
+{
 
-#define SECONDS_PER_MINUTE 60
-namespace utils {
+void log(std::string_view msg, std::string_view file_name, std::string_view func_name);
+std::optional<int> timeStrToSec(std::string_view time_str);
+std::optional<std::string> secToTimeStr(int seconds);
 
-void log(std::string_view msg, std::string_view filename,
-         std::string_view funcName);
-int timeStr_to_sec(const std::string& timeStr);
-std::string sec_to_timeStr(int seconds);
-
-}  // namespace utils
+} // namespace utils

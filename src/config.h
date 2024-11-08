@@ -1,49 +1,50 @@
 #pragma once
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
 /* usic library */
-const std::string USIC_LIBARY = "/Users/ketch/Music/usic";
-const std::string PLAY_LISTS_PATH = "playLists/";
-const std::string DEFAULT_PLAY_LIST = "Default.txt";
+const std::string_view USIC_LIBARY       = "/Users/ketch/Music/usic";
+const std::string_view PLAY_LISTS_PATH   = "playLists/";
+const std::string_view DEFAULT_PLAY_LIST = "Default.txt";
 
 /* playlist */
-#define REPETITIVE false
-#define RANDOM true
-#define RELOAD true
+const bool REPETITIVE = false;
+const bool RANDOM     = true;
+// const bool RELOAD     = true;
 
 /* move cursor */
-#define STEP_SECONDS 10
+const int STEP_SECONDS = 10;
 
 /* volume */
-#define VOLUME_STEP 0.1
+const float VOLUME_STEP = 0.1F;
 
 /* progress bar */
-#define PROGRESS_BAR_LENGTH 100
-#define BAR_ELEMENT '-'
-#define CURSOR_ELEMENT 'o'
+const int PROGRESS_BAR_LENGTH = 100;
+const char BAR_ELEMENT        = '-';
+const char CURSOR_ELEMENT     = 'o';
 
 /* commands */
-#define LOAD "load"
-#define PLAY "play"
-#define PLAY_LATER "play_later"
-#define PLAY_NEXT "play_next"
-#define PLAY_PREV "play_prev"
-#define PAUSE "pause"
-#define CURSOR_FORWARD "cursor_forward"
-#define CURSOR_BACKWARD "cursor_backward"
-#define SET_CURSOR "set_cursor"
-#define GET_CURRENT_PROGRESS "get_current_progress"
-#define VOLUME_UP "volume_up"
-#define VOLUME_DOWN "volume_down"
-#define SET_VOLUME "set_volume"
-#define GET_VOLUME "get_volume"
-#define MUTE "mute"
-#define SET_RANDOM "set_random"
-#define SET_REPETITIVE "set_repetitive"
-#define LIST "list"
-#define QUIT "quit"
+const std::string LOAD                 = "load";
+const std::string PLAY                 = "play";
+const std::string PLAY_LATER           = "play_later";
+const std::string PLAY_NEXT            = "play_next";
+const std::string PLAY_PREV            = "play_prev";
+const std::string PAUSE                = "pause";
+const std::string CURSOR_FORWARD       = "cursor_forward";
+const std::string CURSOR_BACKWARD      = "cursor_backward";
+const std::string SET_CURSOR           = "set_cursor";
+const std::string GET_CURRENT_PROGRESS = "get_current_progress";
+const std::string VOLUME_UP            = "volume_up";
+const std::string VOLUME_DOWN          = "volume_down";
+const std::string SET_VOLUME           = "set_volume";
+const std::string GET_VOLUME           = "get_volume";
+const std::string MUTE                 = "mute";
+const std::string SET_RANDOM           = "set_random";
+const std::string SET_REPETITIVE       = "set_repetitive";
+const std::string GET_LIST             = "get_list";
+const std::string QUIT                 = "quit";
 
 const std::unordered_map<std::string, std::vector<std::string>> COMMANDS = {
     {LOAD, {"l"}},
@@ -63,5 +64,6 @@ const std::unordered_map<std::string, std::vector<std::string>> COMMANDS = {
     {MUTE, {"m"}},
     {SET_RANDOM, {"sr", "random"}},
     {SET_REPETITIVE, {"sp", "repetitive"}},
-    {LIST, {"ls"}},
-    {QUIT, {"q"}}};
+    {GET_LIST, {"list", "ls"}},
+    {QUIT, {"q"}}
+};

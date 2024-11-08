@@ -5,99 +5,116 @@
 #include "miniaudio.h"
 #include "music_list.h"
 
-#define LOADING_FLAGS \
-  MA_SOUND_FLAG_NO_PITCH | MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC
+#define LOADING_FLAGS MA_SOUND_FLAG_NO_PITCH | MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC
 
 class SoundPack;
-class MaComponents;
-class UserData;
-class QuitControl;
+struct MaComponents;
+struct UserData;
+class QuitController;
 
-struct SoundInitNotification {
-  ma_async_notification_callbacks cb;
-  void* pMyData;
+struct SoundInitNotification
+{
+    ma_async_notification_callbacks cb_;
+    void* data_;
 };
 
-class SoundPack {
-  friend void sound_init_notification_callback(
-      ma_async_notification* pNotification);
-  // friend void sound_at_end_callback(void* pUserData, ma_sound* pSound);
-  friend ma_result play_internal(ma_engine* pEngine, SoundPack* pSound_to_play,
-                                 const std::string& musicToPlay,
-                                 std::string* musicPlaying,
-                                 MusicList* musicList,
-                                 SoundPack* pSound_to_register,
-                                 QuitControl* quitC, bool* random,
-                                 bool* repetitive);
+class SoundPack
+{
+  public:
+    std::unique_ptr<ma_sound> sound_{nullptr};
+    SoundPack();
+    ~SoundPack();
 
- private:
-  bool isInitialized{false};
-  bool isPlaying{false};
-  std::mutex mtx;
-  std::unique_ptr<SoundInitNotification> soundInitNotification{nullptr};
+    ma_result init(ma_engine* engine, std::string_view file_path, ma_uint32 flags);
+    void uninit();
+    bool isInitialized();
+    bool isPlaying();
 
- public:
-  std::unique_ptr<ma_sound> pSound{nullptr};
-  SoundPack();
-  ~SoundPack();
+  private:
+    bool initialized_{false};
+    bool playing_{false};
+    std::mutex mtx_;
+    std::unique_ptr<SoundInitNotification> sound_init_notification_{nullptr};
 
-  ma_result init(ma_engine* pEngine, const std::string& pFilePath,
-                 ma_uint32 flags);
-  void uninit();
-  bool is_initialized();
-  bool is_playing();
+    friend void soundInitNotificationCallback(ma_async_notification* notification);
+    friend ma_result playInternal(
+        ma_engine* engine,
+        SoundPack* sound_to_play,
+        std::string_view music_to_play,
+        std::string* music_playing,
+        MusicList* music_list,
+        SoundPack* sound_to_register,
+        QuitController* quit_controller,
+        bool* random,
+        bool* repetitive
+    );
 };
 
-class MaComponents {
- public:
-  std::unique_ptr<ma_engine> pEngine;
-  std::unique_ptr<SoundPack> pSound_to_play;
-  std::unique_ptr<SoundPack> pSound_to_register;
+struct MaComponents
+{
+    std::unique_ptr<ma_engine> engine_;
+    std::unique_ptr<SoundPack> sound_to_play_;
+    std::unique_ptr<SoundPack> sound_to_register_;
 
-  MaComponents();
-  ~MaComponents();
+    MaComponents();
+    ~MaComponents();
 
-  void ma_comp_init_engine();
+    void maCompInitEngine();
 };
 
-class UserData {
- public:
-  ma_engine* pEngine;
-  SoundPack* pSound_to_play;
-  SoundPack* pSound_to_register;
-  QuitControl* quitC;
-  MusicList* musicList;
-  std::string* musicPlaying;
-  bool* random;
-  bool* repetitive;
+struct UserData
+{
+    ma_engine* engine_;
+    SoundPack* sound_to_play_;
+    SoundPack* sound_to_register_;
+    QuitController* quit_controller_;
+    MusicList* music_list_;
+    std::string* music_playing_;
+    bool* random_;
+    bool* repetitive_;
 
-  UserData(ma_engine* _pEngine, SoundPack* _pSound_to_play,
-           SoundPack* _pSound_to_register, QuitControl* _quitC,
-           MusicList* _musicList, std::string* _musicPlaying, bool* _random,
-           bool* _repetitive);
+    UserData(
+        ma_engine* engine,
+        SoundPack* sound_to_play,
+        SoundPack* sound_to_register,
+        QuitController* quit_controller,
+        MusicList* music_list,
+        std::string* music_playing,
+        bool* random,
+        bool* repetitive
+    );
 };
 
-class QuitControl {
-  friend auto cleanFunc(MaComponents* pMa, QuitControl* quitC) -> void;
-  std::mutex mtx;
-  std::condition_variable cv;
-  bool end{false};
-  bool quitF{false};
+class QuitController
+{
+  public:
+    void signal();
+    void reset();
+    void quit();
+    bool atEnd();
+    bool getQuitFlag();
 
- public:
-  void signal();
-  void reset();
-  void quit();
-  bool at_end();
-  bool get_quit_flag();
+  private:
+    std::mutex mtx_;
+    std::condition_variable cv_;
+    bool end_{false};
+    bool quit_flag{false};
+
+    friend auto cleanFunc(MaComponents* ma_comp, QuitController* quit_controller) -> void;
 };
 
-ma_result play_internal(ma_engine* pEngine, SoundPack* pSound_to_play,
-                        const std::string& musicToPlay,
-                        std::string* musicPlaying, MusicList* musicList,
-                        SoundPack* pSound_to_register, QuitControl* quitC,
-                        bool* random, bool* repetitive);
+ma_result playInternal(
+    ma_engine* engine,
+    SoundPack* sound_to_play,
+    std::string_view music_to_play,
+    std::string* music_playing,
+    MusicList* music_list,
+    SoundPack* sound_to_register,
+    QuitController* quit_controller,
+    bool* random,
+    bool* repetitive
+);
 
-void cleanFunc(MaComponents* pMa, QuitControl* quitC);
-void sound_at_end_callback(void* pUserData, ma_sound* pSound);
-void sound_init_notification_callback(ma_async_notification* pNotification);
+void cleanFunc(MaComponents* ma_comp, QuitController* quit_controller);
+void soundAtEndCallback(void* user_data, ma_sound* sound);
+void soundInitNotificationCallback(ma_async_notification* notification);

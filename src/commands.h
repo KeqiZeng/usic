@@ -1,45 +1,50 @@
 #pragma once
 #include <string>
 
-#include "config.h"
 #include "core.h"
 #include "miniaudio.h"
 #include "music_list.h"
-#include "utils.h"
 
-class Progress {
-  std::string str;
-  float percent;
+class Progress
+{
+  public:
+    void init(std::string_view str, float percent);
+    const std::string makeBar();
 
- public:
-  void init(const std::string& _str, float _percent);
-  const std::string make_bar();
+  private:
+    std::string str_;
+    float percent_;
 };
 
-namespace Commands {
+namespace commands
+{
 
-void load(const std::string& listPath, MusicList* musicList, Config* config);
-ma_result play(MaComponents* pMa, const std::string& musicToPlay,
-               std::string* musicPlaying, MusicList* musicList,
-               QuitControl* quitC, Config* config);
+void load(std::string_view list_path, MusicList* music_list, Config* config);
+ma_result play(
+    MaComponents* ma_comp,
+    std::string_view music_to_play,
+    std::string* music_playing,
+    MusicList* music_list,
+    QuitController* quit_controller,
+    Config* config
+);
 
-void play_later(Config* config, const std::string& music,
-                MusicList* music_list);
-ma_result play_next(MaComponents* pMa);
-ma_result play_prev(MaComponents* pMa, MusicList* musicList);
-ma_result pause(MaComponents* pMa);
-ma_result cursor_forward(MaComponents* pMa);
-ma_result cursor_backward(MaComponents* pMa);
-ma_result set_cursor(MaComponents* pMa, const std::string& time);
-ma_result get_current_progress(MaComponents* pMa, Progress* currentProgress);
-ma_result volume_up(ma_engine* pEngine);
-ma_result volume_down(ma_engine* pEngine);
-ma_result set_volume(ma_engine* pEngine, const std::string& volumeStr);
-ma_result get_volume(ma_engine* pEngine, float* volume);
-ma_result mute(ma_engine* pEngine);
-void set_random(Config* config);
-void set_repetitive(Config* config);
-std::vector<std::string> list(MusicList* musicList);
-void quit(MaComponents* pMa, QuitControl* quitC);
+void playLater(Config* config, std::string_view music, MusicList* music_list);
+ma_result playNext(MaComponents* ma_comp);
+ma_result playPrev(MaComponents* ma_comp, MusicList* music_list);
+ma_result pause(MaComponents* ma_comp);
+ma_result cursorForward(MaComponents* ma_comp);
+ma_result cursorBackward(MaComponents* ma_comp);
+ma_result setCursor(MaComponents* ma_comp, std::string_view time);
+ma_result getCurrentProgress(MaComponents* ma_comp, Progress* current_progress);
+ma_result volumeUp(ma_engine* engine);
+ma_result volumeDown(ma_engine* engine);
+ma_result setVolume(ma_engine* engine, std::string_view volume_str);
+ma_result getVolume(ma_engine* engine, float* volume);
+ma_result mute(ma_engine* engine);
+void setRandom(Config* config);
+void setRepetitive(Config* config);
+std::vector<std::string> getList(MusicList* music_list);
+void quit(MaComponents* ma_comp, QuitController* quit_controller);
 
-}  // namespace Commands
+} // namespace commands
