@@ -39,7 +39,6 @@ void NamedPipe::setup()
 
     if (mkfifo(this->PIPE_PATH_.data(), 0666)) {
         log(fmt::format("failed to create named pipe {}", this->PIPE_PATH_), LogType::ERROR, __func__);
-        // return FATAL_ERROR;
         throw std::runtime_error("failed to create named pipe");
     }
     log(fmt::format("created named pipe {}", this->PIPE_PATH_), LogType::INFO, __func__);
@@ -51,7 +50,6 @@ void NamedPipe::openPipe(OpenMode open_mode)
     this->fd_ = open(this->PIPE_PATH_.data(), static_cast<int>(open_mode));
     if (this->fd_ == -1) {
         log(fmt::format("failed to open named pipe {}", this->PIPE_PATH_), LogType::ERROR, __func__);
-        // std::exit(FATAL_ERROR);
         throw std::runtime_error("failed to open named pipe");
     }
     this->mode_ = open_mode;
@@ -110,7 +108,7 @@ Config::Config(bool repetitive, bool random, std::string_view usic_library, std:
 {
     if (usic_library.empty()) {
         log("usicLibrary can not be empty", LogType::ERROR, __func__);
-        std::exit(FATAL_ERROR);
+        throw std::runtime_error("usicLibrary can not be empty");
     }
     if (usic_library.back() != '/') { this->usic_library_ = fmt::format("{}{}", usic_library, '/'); }
     else {
@@ -191,7 +189,6 @@ void setupRuntime(NamedPipe* pipe_to_server, NamedPipe* pipe_to_client)
 {
     if (!std::getenv("HOME")) {
         fmt::print(stderr, "failed to get environment variable: HOME\n");
-        // std::exit(FATAL_ERROR);
         throw std::runtime_error("failed to get environment variable: HOME");
     }
     // create runtime path
@@ -204,7 +201,6 @@ void setupRuntime(NamedPipe* pipe_to_server, NamedPipe* pipe_to_client)
     // setup named pipes
     if (pipe_to_server == nullptr || pipe_to_client == nullptr) {
         log("failed to setup named pipes, pipe_to_server or pipe_to_client is nullptr", LogType::ERROR, __func__);
-        // std::exit(FATAL_ERROR);
         throw std::runtime_error("failed to setup named pipes, pipe_to_server or pipe_to_client is nullptr");
     }
 
@@ -229,10 +225,10 @@ void log(std::string_view message, LogType type, std::string_view func_name)
 {
     switch (type) {
     case LogType::ERROR:
-        std::future<void>{} = std::async(std::launch::async, utils::log, message, ERROR_LOG_FILE, func_name);
+        std::future<void>{} = std::async(std::launch::async, utils::logMsg, message, ERROR_LOG_FILE, func_name);
         break;
     case LogType::INFO:
-        std::future<void>{} = std::async(std::launch::async, utils::log, message, INFO_LOG_FILE, func_name);
+        std::future<void>{} = std::async(std::launch::async, utils::logMsg, message, INFO_LOG_FILE, func_name);
         break;
     default:
         break;

@@ -349,21 +349,11 @@ void server()
     // setup runtime
     auto pipe_to_server = std::make_unique<NamedPipe>(PIPE_TO_SERVER);
     auto pipe_to_client = std::make_unique<NamedPipe>(PIPE_TO_CLIENT);
-    try {
-        setupRuntime(pipe_to_server.get(), pipe_to_client.get());
-    }
-    catch (std::exception& e) {
-        std::exit(FATAL_ERROR);
-    }
+    setupRuntime(pipe_to_server.get(), pipe_to_client.get()); // throw fatal error
 
-    auto config  = std::make_unique<Config>(REPETITIVE, RANDOM, USIC_LIBARY, PLAY_LISTS_PATH);
+    auto config  = std::make_unique<Config>(REPETITIVE, RANDOM, USIC_LIBRARY, PLAY_LISTS_PATH); // throw fatal error
     auto ma_comp = std::make_unique<MaComponents>();
-    try {
-        ma_comp->maCompInitEngine();
-    }
-    catch (std::exception& e) {
-        std::exit(FATAL_ERROR);
-    }
+    ma_comp->maCompInitEngine(); // throw fatal error
 
     auto music_list = std::make_unique<MusicList>();
     initMusicList(music_list.get(), config.get()); // throw fatal error
@@ -378,7 +368,7 @@ void server()
     std::vector<std::string> args;
     while (!quit_controller->getQuitFlag()) {
         args.clear();
-        cmd = getCommand(pipe_to_server.get(), pipe_to_client.get());
+        cmd = getCommand(pipe_to_server.get(), pipe_to_client.get()); // throw fatal error
         if (cmd == "") {
             log("failed to get command", LogType::ERROR, __func__);
             continue;
@@ -393,7 +383,7 @@ void server()
             music_list.get(),
             quit_controller.get(),
             config.get()
-        );
+        ); // throw fatal error
     }
     pipe_to_server->deletePipe();
     pipe_to_client->deletePipe();

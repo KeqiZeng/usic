@@ -49,7 +49,12 @@ int main(int argc, char* argv[])
 
         // change the name of server process
         strncpy(argv[0], "usic server", sizeof("usic server"));
-        server();
+        try {
+            server();
+        }
+        catch (std::exception& e) {
+            return FATAL_ERROR;
+        }
         return 0;
     }
     if (argc > 1) {
@@ -67,7 +72,12 @@ int main(int argc, char* argv[])
             fmt::print("Server is not running\n");
             return 1;
         }
-        client(argc, argv);
+        try {
+            client(argc, argv);
+        }
+        catch (std::exception& e) {
+            return FATAL_ERROR;
+        }
         return 0;
     }
 }

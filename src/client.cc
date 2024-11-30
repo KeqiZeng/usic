@@ -33,19 +33,8 @@ void client(int argc, char* argv[])
     auto pipe_to_server = std::make_unique<NamedPipe>(PIPE_TO_SERVER);
     auto pipe_to_client = std::make_unique<NamedPipe>(PIPE_TO_CLIENT);
 
-    try {
-        pipe_to_server->openPipe(OpenMode::WR_ONLY_BLOCK);
-    }
-    catch (std::exception& e) {
-        std::exit(FATAL_ERROR);
-    }
-
-    try {
-        pipe_to_client->openPipe(OpenMode::RD_ONLY_BLOCK);
-    }
-    catch (std::exception& e) {
-        std::exit(FATAL_ERROR);
-    }
+    pipe_to_server->openPipe(OpenMode::WR_ONLY_BLOCK);
+    pipe_to_client->openPipe(OpenMode::RD_ONLY_BLOCK);
 
     // send command to server
     const std::string CMD = concatenateArgs(argc, argv);

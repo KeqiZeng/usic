@@ -210,7 +210,7 @@ void soundAtEndCallback(void* user_data, ma_sound* sound)
     auto* data = static_cast<UserData*>(user_data);
     if (!data) {
         log("got an invalid user_data", LogType::ERROR, __func__);
-        std::exit(FATAL_ERROR);
+        throw std::runtime_error("got an invalid user_data");
     }
     const std::string& music_playing = *(data->music_playing_);
 
@@ -232,7 +232,7 @@ void soundAtEndCallback(void* user_data, ma_sound* sound)
     );
     if (result != MA_SUCCESS) {
         log(fmt::format("failed to play music: {}", MUSIC_TO_PLAY), LogType::ERROR, __func__);
-        std::exit(FATAL_ERROR);
+        throw std::runtime_error("failed to play music");
     }
     data->quit_controller_->signal();
     delete data;
@@ -244,7 +244,7 @@ void soundInitNotificationCallback(ma_async_notification* notification)
     auto* data                    = static_cast<SoundPack*>(sound_init_notification->data_);
     if (!data) {
         log("got an invalid data", LogType::ERROR, __func__);
-        std::exit(FATAL_ERROR);
+        throw std::runtime_error("got an invalid data");
     }
     data->initialized_ = true;
     log("sound initialized", LogType::INFO, __func__);
