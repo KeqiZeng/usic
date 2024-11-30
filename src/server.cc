@@ -248,10 +248,10 @@ void handleCommand(
             }
         }
     }
-    else if (sub_cmd == GET_CURRENT_PROGRESS ||
-             std::ranges::find(COMMANDS.at(GET_CURRENT_PROGRESS), sub_cmd) != COMMANDS.at(GET_CURRENT_PROGRESS).end()) {
+    else if (sub_cmd == GET_PROGRESS ||
+             std::ranges::find(COMMANDS.at(GET_PROGRESS), sub_cmd) != COMMANDS.at(GET_PROGRESS).end()) {
         auto progress    = std::make_unique<Progress>();
-        ma_result result = commands::getCurrentProgress(ma_comp, progress.get());
+        ma_result result = commands::getProgress(ma_comp, *music_playing, progress.get());
         if (result != MA_SUCCESS) { logErrorAndSendToClient("Failed to get progress", pipe_to_server, pipe_to_client); }
         else {
             sendMsgToClient(progress->makeBar(), pipe_to_server, pipe_to_client);

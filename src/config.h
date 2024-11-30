@@ -20,7 +20,7 @@ const int STEP_SECONDS = 10;
 const float VOLUME_STEP = 0.1F;
 
 /* progress bar */
-const int PROGRESS_BAR_LENGTH = 100;
+const int PROGRESS_BAR_LENGTH = 50;
 const char BAR_ELEMENT        = '-';
 const char CURSOR_ELEMENT     = 'o';
 

@@ -128,4 +128,11 @@ std::optional<std::string> secToTimeStr(int seconds)
     return fmt::format("{:d}:{:02d}", min, sec);
 }
 
+std::optional<std::string> extractMusicName(const std::string& music_path)
+{
+    std::filesystem::path path(music_path);
+    if (path.empty() || !path.has_filename() || !path.has_extension()) { return std::nullopt; }
+    return path.stem().string();
+}
+
 } // namespace utils

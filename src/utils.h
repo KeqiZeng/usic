@@ -13,5 +13,6 @@ const std::string createTmpDefaultList();
 void deleteTmpDefaultList();
 std::optional<int> timeStrToSec(std::string_view time_str);
 std::optional<std::string> secToTimeStr(int seconds);
+std::optional<std::string> extractMusicName(const std::string& music_path);
 
 } // namespace utils

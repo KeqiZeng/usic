@@ -8,11 +8,12 @@
 class Progress
 {
   public:
-    void init(std::string_view str, float percent);
+    void init(std::string_view music_name, std::string_view progress, float percent);
     const std::string makeBar();
 
   private:
-    std::string str_;
+    std::string music_name_;
+    std::string progress_;
     float percent_;
 };
 
@@ -36,7 +37,7 @@ ma_result pause(MaComponents* ma_comp);
 ma_result cursorForward(MaComponents* ma_comp);
 ma_result cursorBackward(MaComponents* ma_comp);
 ma_result setCursor(MaComponents* ma_comp, std::string_view time);
-ma_result getCurrentProgress(MaComponents* ma_comp, Progress* current_progress);
+ma_result getProgress(MaComponents* ma_comp, const std::string& music_playing, Progress* current_progress);
 ma_result volumeUp(ma_engine* engine);
 ma_result volumeDown(ma_engine* engine);
 ma_result setVolume(ma_engine* engine, std::string_view volume_str);

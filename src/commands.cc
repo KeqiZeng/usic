@@ -13,10 +13,11 @@
 #include <utility>
 #include <vector>
 
-void Progress::init(std::string_view str, float percent)
+void Progress::init(std::string_view music_name, std::string_view progress, float percent)
 {
-    this->str_     = std::move(str);
-    this->percent_ = percent;
+    this->music_name_ = std::move(music_name);
+    this->progress_   = std::move(progress);
+    this->percent_    = percent;
 }
 
 const std::string Progress::makeBar()
@@ -24,7 +25,7 @@ const std::string Progress::makeBar()
     int n = percent_ * PROGRESS_BAR_LENGTH;
     std::string bar(PROGRESS_BAR_LENGTH, BAR_ELEMENT);
     bar[n] = CURSOR_ELEMENT;
-    return fmt::format("{} {}", bar, str_);
+    return fmt::format("{}\n{} {}", music_name_, bar, progress_);
 }
 
 static ma_sound* getPlayingSound(MaComponents* ma_comp)
@@ -265,7 +266,7 @@ ma_result setCursor(MaComponents* ma_comp, std::string_view time)
     return result;
 }
 
-ma_result getCurrentProgress(MaComponents* ma_comp, Progress* current_progress)
+ma_result getProgress(MaComponents* ma_comp, const std::string& music_playing, Progress* current_progress)
 {
     ma_sound* sound = getPlayingSound(ma_comp);
     if (sound == nullptr) {
@@ -314,8 +315,15 @@ ma_result getCurrentProgress(MaComponents* ma_comp, Progress* current_progress)
         return MA_ERROR;
     }
 
-    std::string str = fmt::format("{}/{}", cursor_str.value(), duration_str.value());
-    current_progress->init(str, cursor / duration);
+    const std::string PROGRESS = fmt::format("{}/{}", cursor_str.value(), duration_str.value());
+
+    std::optional<std::string> music_name = utils::extractMusicName(music_playing);
+    if (!music_name.has_value()) {
+        log(fmt::format("failed to extract music name from \"{}\"", music_playing), LogType::ERROR, __func__);
+        return MA_ERROR;
+    }
+
+    current_progress->init(music_name.value(), PROGRESS, cursor / duration);
     return result;
 }
 
@@ -432,7 +440,13 @@ void setRepetitive(Config* config)
 
 std::vector<std::string> getList(MusicList* music_list)
 {
-    return music_list->getList();
+    std::vector<std::string> raw_list = music_list->getList();
+    std::vector<std::string> list;
+    for (auto& music : raw_list) {
+        std::optional<std::string> music_name = utils::extractMusicName(music);
+        if (music_name.has_value()) { list.push_back(music_name.value()); }
+    }
+    return list;
 }
 
 static ma_result stop(MaComponents* ma_comp)
