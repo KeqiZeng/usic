@@ -28,7 +28,7 @@ class MusicList
     MusicList(Config* config, std::string_view list_file);
     ~MusicList();
 
-    void load(std::string_view list_path, Config* config, bool reload = true);
+    void load(std::string_view list_path, Config* config);
     [[nodiscard]] bool isEmpty() const;
     [[nodiscard]] int getCount() const;
     [[nodiscard]] std::vector<std::string> getList();

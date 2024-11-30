@@ -12,7 +12,6 @@ const std::string_view DEFAULT_PLAY_LIST = "Default.txt";
 /* playlist */
 const bool REPETITIVE = false;
 const bool RANDOM     = true;
-// const bool RELOAD     = true;
 
 /* move cursor */
 const int STEP_SECONDS = 10;

@@ -54,9 +54,9 @@ MusicList::~MusicList()
     }
 }
 
-void MusicList::load(std::string_view list_path, Config* config, bool reload)
+void MusicList::load(std::string_view list_path, Config* config)
 {
-    if (reload) { this->clear(); }
+    this->clear();
     std::filesystem::path list{list_path};
     std::ifstream file(list);
     if (file.is_open()) {

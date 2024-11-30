@@ -5,32 +5,45 @@
 #include "fmt/core.h"
 #include "music_list.h"
 #include "runtime.h"
+#include "utils.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdlib>
-#include <exception>
 #include <memory>
 #include <string>
 #include <thread>
 #include <vector>
 
+void initMusicList(MusicList* music_list, Config* config)
+{
+    if (DEFAULT_PLAY_LIST.empty()) {
+        const std::string DEFAULT_LIST = utils::createTmpDefaultList();
+        music_list->load(DEFAULT_LIST, config);
+        if (music_list->isEmpty()) {
+            log(fmt::format("failed to load default music list while user defined default music list is empty"),
+                LogType::ERROR,
+                __func__);
+            throw std::runtime_error("failed to load default music list");
+        }
+        utils::deleteTmpDefaultList();
+    }
+    else {
+        music_list->load(fmt::format("{}{}", config->getPlayListPath(), DEFAULT_PLAY_LIST), config);
+        if (music_list->isEmpty()) {
+            log(fmt::format("failed to load music list {}{}", config->getPlayListPath(), DEFAULT_PLAY_LIST),
+                LogType::ERROR,
+                __func__);
+            throw std::runtime_error("failed to load default music list");
+        }
+    }
+}
+
 std::string getCommand(NamedPipe* pipe_to_server, NamedPipe* pipe_to_client)
 {
-    try {
-        pipe_to_server->openPipe(OpenMode::RD_ONLY_BLOCK);
-    }
-    catch (const std::exception& e) {
-        std::exit(FATAL_ERROR);
-    }
-
-    try {
-        pipe_to_client->openPipe(OpenMode::WR_ONLY_BLOCK);
-    }
-    catch (const std::exception& e) {
-        std::exit(FATAL_ERROR);
-    }
+    pipe_to_server->openPipe(OpenMode::RD_ONLY_BLOCK);
+    pipe_to_client->openPipe(OpenMode::WR_ONLY_BLOCK);
 
     std::string cmd = pipe_to_server->readOut();
     pipe_to_server->closePipe();
@@ -352,15 +365,8 @@ void server()
         std::exit(FATAL_ERROR);
     }
 
-    auto music_list =
-        std::make_unique<MusicList>(config.get(), fmt::format("{}{}", config->getPlayListPath(), DEFAULT_PLAY_LIST));
-
-    if (music_list->isEmpty()) {
-        log(fmt::format("failed to load music list {}{}", config->getPlayListPath(), DEFAULT_PLAY_LIST),
-            LogType::ERROR,
-            __func__);
-        std::exit(FATAL_ERROR);
-    }
+    auto music_list = std::make_unique<MusicList>();
+    initMusicList(music_list.get(), config.get()); // throw fatal error
 
     auto music_playing   = std::make_unique<std::string>();
     auto quit_controller = std::make_unique<QuitController>();
