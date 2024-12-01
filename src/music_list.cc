@@ -2,7 +2,6 @@
 #include "fmt/core.h"
 #include "runtime.h"
 
-#include <cmath>
 #include <fstream>
 #include <memory>
 #include <random>
@@ -26,20 +25,19 @@ MusicNode::MusicNode(std::string_view music)
 // 2. musicList->head_ == musicList->tail_ != NULL; only one musicNode in List
 // 3. musicList->head_ != musicList->tail_, head_ != NULL && tail_ != NULL,
 // head_->prev == NULL, tail_->next == NULL
-MusicList::MusicList(Config* config, std::string_view list_file_path)
+MusicList::MusicList(std::string_view list_file_path)
 {
     std::filesystem::path list_file{list_file_path};
     std::ifstream file(list_file);
     if (file.is_open()) {
         std::string line;
         while (std::getline(file, line)) {
-            line = fmt::format("{}{}", config->getUsicLibrary(), line);
             this->tailIn(line);
         }
         file.close();
     }
     else {
-        log(fmt::format("Failed to open file: {}", list_file_path), LogType::ERROR, __func__);
+        LOG(fmt::format("Failed to open file: {}", list_file_path), LogType::ERROR);
     }
 }
 MusicList::~MusicList()
@@ -54,7 +52,7 @@ MusicList::~MusicList()
     }
 }
 
-void MusicList::load(std::string_view list_path, Config* config)
+void MusicList::load(std::string_view list_path)
 {
     this->clear();
     std::filesystem::path list{list_path};
@@ -62,13 +60,12 @@ void MusicList::load(std::string_view list_path, Config* config)
     if (file.is_open()) {
         std::string line;
         while (std::getline(file, line)) {
-            line = fmt::format("{}{}", config->getUsicLibrary(), line);
             this->tailIn(line);
         }
         file.close();
     }
     else {
-        log(fmt::format("Failed to open file: {}", list_path), LogType::ERROR, __func__);
+        LOG(fmt::format("Failed to open file: {}", list_path), LogType::ERROR);
     }
 }
 

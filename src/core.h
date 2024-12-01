@@ -1,16 +1,18 @@
 #pragma once
+#include <atomic>
 #include <memory>
 #include <mutex>
 
 #include "miniaudio.h"
 #include "music_list.h"
+#include "runtime.h"
 
 #define LOADING_FLAGS MA_SOUND_FLAG_NO_PITCH | MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC
 
 class SoundPack;
 struct MaComponents;
 struct UserData;
-class QuitController;
+class Controller;
 
 struct SoundInitNotification
 {
@@ -31,8 +33,8 @@ class SoundPack
     bool isPlaying();
 
   private:
-    bool initialized_{false};
-    bool playing_{false};
+    std::atomic<bool> initialized_{false};
+    std::atomic<bool> playing_{false};
     std::mutex mtx_;
     std::unique_ptr<SoundInitNotification> sound_init_notification_{nullptr};
 
@@ -44,9 +46,8 @@ class SoundPack
         std::string* music_playing,
         MusicList* music_list,
         SoundPack* sound_to_register,
-        QuitController* quit_controller,
-        bool* random,
-        bool* repetitive
+        Controller* controller,
+        Config* config
     );
 };
 
@@ -67,40 +68,41 @@ struct UserData
     ma_engine* engine_;
     SoundPack* sound_to_play_;
     SoundPack* sound_to_register_;
-    QuitController* quit_controller_;
+    Controller* controller_;
     MusicList* music_list_;
     std::string* music_playing_;
-    bool* random_;
-    bool* repetitive_;
+    Config* config_;
 
     UserData(
         ma_engine* engine,
         SoundPack* sound_to_play,
         SoundPack* sound_to_register,
-        QuitController* quit_controller,
+        Controller* controller,
         MusicList* music_list,
         std::string* music_playing,
-        bool* random,
-        bool* repetitive
+        Config* config
     );
 };
 
-class QuitController
+class Controller
 {
   public:
-    void signal();
-    void reset();
+    void signalEnd();
+    void signalError();
     void quit();
     bool atEnd();
+    bool getError();
     bool getQuitFlag();
+    void waitForCleanerExit();
 
   private:
-    std::mutex mtx_;
-    std::condition_variable cv_;
-    bool end_{false};
-    bool quit_flag{false};
+    std::atomic_flag flag_ = ATOMIC_FLAG_INIT;
+    std::atomic<bool> end_{false};
+    std::atomic<bool> error_{false};
+    std::atomic<bool> quit_flag_{false};
+    std::atomic<bool> cleaner_exited_{false};
 
-    friend auto cleanFunc(MaComponents* ma_comp, QuitController* quit_controller) -> void;
+    friend void cleanFunc(MaComponents* ma_comp, Controller* controller);
 };
 
 ma_result playInternal(
@@ -110,11 +112,10 @@ ma_result playInternal(
     std::string* music_playing,
     MusicList* music_list,
     SoundPack* sound_to_register,
-    QuitController* quit_controller,
-    bool* random,
-    bool* repetitive
+    Controller* controller,
+    Config* config
 );
 
-void cleanFunc(MaComponents* ma_comp, QuitController* quit_controller);
+void cleanFunc(MaComponents* ma_comp, Controller* controller);
 void soundAtEndCallback(void* user_data, ma_sound* sound);
 void soundInitNotificationCallback(ma_async_notification* notification);

@@ -1,13 +1,17 @@
-#include <cmath>
+#include <cstdio>
 #include <cstring>
 #include <exception>
+#include <string>
 #include <sys/_types/_pid_t.h>
 #include <unistd.h>
 
+#include "app.h"
 #include "client.h"
+#include "config.h"
 #include "fmt/core.h"
 #include "runtime.h"
 #include "server.h"
+#include "tools.h"
 
 /* marcos */
 #define MA_ENABLE_ONLY_SPECIFIC_BACKENDS
@@ -19,6 +23,40 @@
 
 // miniaudio should be included after MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
+
+bool handleFlagOrCommand(int argc, char* argv[])
+{
+    if (argc > 1) {
+        std::vector<std::string> args;
+        for (int i = 1; i < argc; i++) {
+            args.push_back(argv[i]);
+        }
+
+        if (args[0] == PRINT_VERSION ||
+            std::ranges::find(COMMANDS.at(PRINT_VERSION), args[0]) != COMMANDS.at(PRINT_VERSION).end()) {
+            fmt::print("{}\n", VERSION);
+        }
+        else if (args[0] == PRINT_HELP ||
+                 std::ranges::find(COMMANDS.at(PRINT_HELP), args[0]) != COMMANDS.at(PRINT_HELP).end()) {
+            fmt::print("{}\n", DOC);
+        }
+        else if (args[0] == ADD_MUSIC_TO_LIST ||
+                 std::ranges::find(COMMANDS.at(ADD_MUSIC_TO_LIST), args[0]) != COMMANDS.at(ADD_MUSIC_TO_LIST).end()) {
+            if (args.size() < 2) { fmt::print(stderr, "not enough arguments\n"); }
+            auto config = std::make_unique<Config>(
+                REPETITIVE,
+                RANDOM,
+                USIC_LIBRARY,
+                PLAY_LISTS_PATH
+            ); // throw fatal error
+            tools::addMusicToList(args[1], config.get());
+        }
+        else {
+            return false;
+        }
+    }
+    return true;
+}
 
 int main(int argc, char* argv[])
 {
@@ -32,14 +70,14 @@ int main(int argc, char* argv[])
 
     if (argc == 1) {
         if (has_server) {
-            fmt::print("Server is already running\n");
+            fmt::print(stderr, "Server is already running\n");
             return 0;
         }
 
         pid_t pid = fork();
         if (pid < 0) {
             // Forking failed
-            log("forking child process failed", LogType::ERROR, __func__);
+            LOG("forking child process failed", LogType::ERROR);
             return 1;
         }
         if (pid > 0) {
@@ -57,27 +95,23 @@ int main(int argc, char* argv[])
         }
         return 0;
     }
-    if (argc > 1) {
-        if (strcmp(argv[1], "-v") == 0 || strcmp(argv[1], "--version") == 0) {
-            fmt::print("{}\n", VERSION);
-            return 0;
-        }
 
-        if (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0) {
-            fmt::print("{}", DOC);
-            return 0;
-        }
-
-        if (!has_server) {
-            fmt::print("Server is not running\n");
-            return 1;
-        }
-        try {
-            client(argc, argv);
-        }
-        catch (std::exception& e) {
-            return FATAL_ERROR;
-        }
-        return 0;
+    try {
+        if (handleFlagOrCommand(argc, argv)) { return 0; }
     }
+    catch (std::exception& e) {
+        return FATAL_ERROR;
+    }
+
+    if (!has_server) {
+        fmt::print(stderr, "Server is not running\n");
+        return FATAL_ERROR;
+    }
+    try {
+        client(argc, argv);
+    }
+    catch (std::exception& e) {
+        return FATAL_ERROR;
+    }
+    return 0;
 }

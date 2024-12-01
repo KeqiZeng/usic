@@ -1,39 +1,31 @@
-#include <algorithm>
-#include <catch2/catch_test_macros.hpp>
-#include <memory>
-#include <string>
-#include <vector>
-
-#include "fmt/core.h"
 #include "music_list.h"
 #include "runtime.h"
+#include <catch2/catch_test_macros.hpp>
 
 TEST_CASE("The methods of MusicList can work properly")
 {
     SECTION("MusicList can be initialized from a file")
     {
-        std::unique_ptr<Config> config = std::make_unique<Config>(false, false, "./tests", "playLists/");
-        std::unique_ptr<MusicList> musicList(
-            new MusicList(config.get(), fmt::format("{}{}", config->getPlayListPath(), "music_list.txt"))
-        );
+        auto config    = std::make_unique<Config>(false, false, "./tests", "playLists/");
+        auto musicList = std::make_unique<MusicList>(fmt::format("{}{}", config->getPlayListPath(), "music_list.txt"));
 
         CHECK(musicList->getCount() == 12);
         CHECK(
             musicList->getList() == std::vector<std::string>(
-                                        {"./tests/Beyond-情人.flac",
-                                         "./tests/李宗盛-山丘.wav",
-                                         "./tests/赵雷-南方姑娘 (Live).mp3",
-                                         "./tests/Beyond-灰色轨迹.flac",
-                                         "./tests/Beyond-海阔天空.wav",
-                                         "./tests/Anne-Sophie Versnaeyen,Gabriel "
+                                        {"Beyond-情人.flac",
+                                         "李宗盛-山丘.wav",
+                                         "赵雷-南方姑娘 (Live).mp3",
+                                         "Beyond-灰色轨迹.flac",
+                                         "Beyond-海阔天空.wav",
+                                         "Anne-Sophie Versnaeyen,Gabriel "
                                          "Saban,Philippe Briand-Shining Horizon.flac",
-                                         "./tests/Beyond-谁伴我闯荡 91.flac",
-                                         "./tests/Beyond-灰色轨迹 91.flac",
-                                         "./tests/Beyond-冷雨夜 91.flac",
-                                         "./tests/Anne-Sophie Versnaeyen,Gabriel "
+                                         "Beyond-谁伴我闯荡 91.flac",
+                                         "Beyond-灰色轨迹 91.flac",
+                                         "Beyond-冷雨夜 91.flac",
+                                         "Anne-Sophie Versnaeyen,Gabriel "
                                          "Saban-Facing the Past.flac",
-                                         "./tests/赵雷-我记得.wav",
-                                         "./tests/Beyond-海阔天空 05.mp3"}
+                                         "赵雷-我记得.wav",
+                                         "Beyond-海阔天空 05.mp3"}
                                     )
         );
     }

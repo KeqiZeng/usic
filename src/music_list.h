@@ -2,8 +2,6 @@
 #include <string>
 #include <vector>
 
-#include "runtime.h"
-
 class MusicNode
 {
   public:
@@ -25,10 +23,10 @@ class MusicList
 {
   public:
     MusicList() = default;
-    MusicList(Config* config, std::string_view list_file);
+    MusicList(std::string_view list_file);
     ~MusicList();
 
-    void load(std::string_view list_path, Config* config);
+    void load(std::string_view list_path);
     [[nodiscard]] bool isEmpty() const;
     [[nodiscard]] int getCount() const;
     [[nodiscard]] std::vector<std::string> getList();

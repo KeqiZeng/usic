@@ -7,7 +7,6 @@
 /* usic library */
 const std::string_view USIC_LIBRARY    = "/Users/ketch/Music/usic";
 const std::string_view PLAY_LISTS_PATH = "playLists/";
-// const std::string_view DEFAULT_PLAY_LIST = "Default.txt";
 const std::string_view DEFAULT_PLAY_LIST;
 
 /* playlist */
@@ -26,25 +25,28 @@ const char BAR_ELEMENT        = '-';
 const char CURSOR_ELEMENT     = 'o';
 
 /* commands */
-const std::string LOAD            = "load";
-const std::string PLAY            = "play";
-const std::string PLAY_LATER      = "play_later";
-const std::string PLAY_NEXT       = "play_next";
-const std::string PLAY_PREV       = "play_prev";
-const std::string PAUSE           = "pause";
-const std::string CURSOR_FORWARD  = "cursor_forward";
-const std::string CURSOR_BACKWARD = "cursor_backward";
-const std::string SET_CURSOR      = "set_cursor";
-const std::string GET_PROGRESS    = "get_progress";
-const std::string VOLUME_UP       = "volume_up";
-const std::string VOLUME_DOWN     = "volume_down";
-const std::string SET_VOLUME      = "set_volume";
-const std::string GET_VOLUME      = "get_volume";
-const std::string MUTE            = "mute";
-const std::string SET_RANDOM      = "set_random";
-const std::string SET_REPETITIVE  = "set_repetitive";
-const std::string GET_LIST        = "get_list";
-const std::string QUIT            = "quit";
+const std::string LOAD              = "load";
+const std::string PLAY              = "play";
+const std::string PLAY_LATER        = "play_later";
+const std::string PLAY_NEXT         = "play_next";
+const std::string PLAY_PREV         = "play_prev";
+const std::string PAUSE             = "pause";
+const std::string CURSOR_FORWARD    = "cursor_forward";
+const std::string CURSOR_BACKWARD   = "cursor_backward";
+const std::string SET_CURSOR        = "set_cursor";
+const std::string GET_PROGRESS      = "get_progress";
+const std::string VOLUME_UP         = "volume_up";
+const std::string VOLUME_DOWN       = "volume_down";
+const std::string SET_VOLUME        = "set_volume";
+const std::string GET_VOLUME        = "get_volume";
+const std::string MUTE              = "mute";
+const std::string SET_RANDOM        = "set_random";
+const std::string SET_REPETITIVE    = "set_repetitive";
+const std::string GET_LIST          = "get_list";
+const std::string QUIT              = "quit";
+const std::string PRINT_VERSION     = "--version";
+const std::string PRINT_HELP        = "--help";
+const std::string ADD_MUSIC_TO_LIST = "add_music_to_list";
 
 const std::unordered_map<std::string, std::vector<std::string>> COMMANDS = {
     {LOAD, {"l"}},
@@ -65,5 +67,8 @@ const std::unordered_map<std::string, std::vector<std::string>> COMMANDS = {
     {SET_RANDOM, {"sr", "random"}},
     {SET_REPETITIVE, {"sp", "repetitive"}},
     {GET_LIST, {"list", "ls"}},
-    {QUIT, {"q"}}
+    {QUIT, {"q"}},
+    {PRINT_VERSION, {"-v"}},
+    {PRINT_HELP, {"-h"}},
+    {ADD_MUSIC_TO_LIST, {"aml", "add"}}
 };

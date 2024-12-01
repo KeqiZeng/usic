@@ -2,64 +2,83 @@
 #include "fmt/core.h"
 #include "music_list.h"
 #include "runtime.h"
-#include <cmath>
+#include <atomic>
 #include <cstdlib>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <string_view>
+#include <thread>
 
 SoundPack::SoundPack()
-    : sound_init_notification_(new SoundInitNotification)
+    : sound_init_notification_(std::make_unique<SoundInitNotification>())
 {
-    this->sound_init_notification_->cb_.onSignal = soundInitNotificationCallback;
-    this->sound_init_notification_->data_        = this;
+    sound_init_notification_->cb_.onSignal = soundInitNotificationCallback;
+    sound_init_notification_->data_        = this;
 }
 SoundPack::~SoundPack()
 {
-    this->uninit();
+    uninit();
 }
 
 ma_result SoundPack::init(ma_engine* engine, std::string_view file_path, ma_uint32 flags)
 {
-    std::lock_guard<std::mutex> lock(this->mtx_);
-    if (this->initialized_) {
-        log("can not init sound twice", LogType::ERROR, __func__);
+    std::lock_guard<std::mutex> lock(mtx_);
+    if (initialized_.load(std::memory_order_acquire)) {
+        LOG("cannot initialize twice", LogType::ERROR);
         return MA_ERROR;
     }
-    if (!this->sound_) { this->sound_ = std::unique_ptr<ma_sound>(new ma_sound); }
+
+    sound_                                      = std::make_unique<ma_sound>();
     ma_sound_config config                      = ma_sound_config_init_2(engine);
     config.pFilePath                            = file_path.data();
     config.flags                                = flags;
-    config.initNotifications.done.pNotification = this->sound_init_notification_.get();
+    config.initNotifications.done.pNotification = sound_init_notification_.get();
 
-    return ma_sound_init_ex(engine, &config, this->sound_.get());
+    ma_result result = ma_sound_init_ex(engine, &config, sound_.get());
+    if (result != MA_SUCCESS) {
+        LOG("failed to initialize sound", LogType::ERROR);
+        sound_.reset();
+        initialized_.store(false, std::memory_order_release);
+        return result;
+    }
+
+    return MA_SUCCESS;
 }
 
 void SoundPack::uninit()
 {
-    if (this->initialized_ && this->sound_) {
-        std::lock_guard<std::mutex> lock(this->mtx_);
-        ma_sound_uninit(this->sound_.get());
-        this->initialized_ = false;
-        this->playing_     = false;
-        log("uninit sound", LogType::INFO, __func__);
-    }
+    std::lock_guard<std::mutex> lock(mtx_);
+
+    if (!initialized_.load(std::memory_order_acquire)) { return; }
+
+    if (!sound_) { return; }
+
+    ma_result result = ma_sound_stop(sound_.get());
+    if (result != MA_SUCCESS) { LOG("failed to stop sound", LogType::ERROR); }
+
+    ma_sound_uninit(sound_.get());
+
+    initialized_.store(false, std::memory_order_release);
+    playing_.store(false, std::memory_order_release);
+
+    sound_.reset();
+    LOG("uninitialized sound", LogType::INFO);
 }
 
 bool SoundPack::isInitialized()
 {
-    return this->initialized_;
+    return initialized_.load(std::memory_order_acquire);
 }
 bool SoundPack::isPlaying()
 {
-    return this->playing_;
+    return playing_.load(std::memory_order_acquire);
 }
 
 MaComponents::MaComponents()
-    : engine_(new ma_engine)
-    , sound_to_play_(new SoundPack)
-    , sound_to_register_(new SoundPack)
+    : engine_(std::make_unique<ma_engine>())
+    , sound_to_play_(std::make_unique<SoundPack>())
+    , sound_to_register_(std::make_unique<SoundPack>())
 {
 }
 
@@ -72,7 +91,7 @@ void MaComponents::maCompInitEngine()
 {
     ma_result result = ma_engine_init(nullptr, engine_.get());
     if (result != MA_SUCCESS) {
-        log("failed to initialize engine", LogType::ERROR, __func__);
+        LOG("failed to initialize engine", LogType::ERROR);
         throw std::runtime_error("failed to initialize engine");
     }
 }
@@ -81,48 +100,62 @@ UserData::UserData(
     ma_engine* engine,
     SoundPack* sound_to_play,
     SoundPack* sound_to_register,
-    QuitController* quit_controller,
+    Controller* controller,
     MusicList* music_list,
     std::string* music_playing,
-    bool* random,
-    bool* repetitive
+    Config* config
 )
     : engine_(engine)
     , sound_to_play_(sound_to_play)
     , sound_to_register_(sound_to_register)
-    , quit_controller_(quit_controller)
+    , controller_(controller)
     , music_list_(music_list)
     , music_playing_(music_playing)
-    , random_(random)
-    , repetitive_(repetitive)
+    , config_(config)
 {
 }
 
-void QuitController::signal()
+void Controller::signalEnd()
 {
-    std::lock_guard<std::mutex> lock(this->mtx_);
-    this->end_ = true;
-    this->cv_.notify_one();
+    end_.store(true, std::memory_order_release);
+    flag_.test_and_set(std::memory_order_release);
+    flag_.notify_one();
 }
 
-void QuitController::reset()
+void Controller::signalError()
 {
-    this->end_ = false;
-}
-void QuitController::quit()
-{
-    std::lock_guard<std::mutex> lock(this->mtx_);
-    this->quit_flag = true;
-    this->cv_.notify_one();
+    error_.store(true, std::memory_order_release);
+    flag_.test_and_set(std::memory_order_release);
+    flag_.notify_one();
 }
 
-bool QuitController::atEnd()
+void Controller::quit()
 {
-    return this->end_;
+    quit_flag_.store(true, std::memory_order_release);
+    flag_.test_and_set(std::memory_order_release);
+    flag_.notify_one();
 }
-bool QuitController::getQuitFlag()
+
+bool Controller::atEnd()
 {
-    return this->quit_flag;
+    return end_.load(std::memory_order_acquire);
+}
+
+bool Controller::getError()
+{
+    return error_.load(std::memory_order_acquire);
+}
+
+bool Controller::getQuitFlag()
+{
+    return quit_flag_.load(std::memory_order_acquire);
+}
+
+void Controller::waitForCleanerExit()
+{
+    while (!cleaner_exited_.load(std::memory_order_acquire)) {
+        std::this_thread::yield();
+    }
 }
 
 ma_result playInternal(
@@ -132,76 +165,84 @@ ma_result playInternal(
     std::string* music_playing,
     MusicList* music_list,
     SoundPack* sound_to_register,
-    QuitController* quit_controller,
-    bool* random,
-    bool* repetitive
+    Controller* controller,
+    Config* config
 )
 {
     *music_playing = music_to_play;
 
-    {
-        std::lock_guard<std::mutex> lock(sound_to_register->mtx_);
-        sound_to_register->playing_ = false;
-    }
+    // {
+    //     std::lock_guard<std::mutex> lock(sound_to_register->mtx_);
+    //     sound_to_register->playing_ = false;
+    // }
+    sound_to_register->playing_.store(false, std::memory_order_release);
 
-    ma_result result = sound_to_play->init(engine, music_to_play, LOADING_FLAGS);
+    ma_result result =
+        sound_to_play->init(engine, fmt::format("{}{}", config->getUsicLibrary(), music_to_play), LOADING_FLAGS);
     if (result != MA_SUCCESS) {
-        log(fmt::format("failed to initialize sound from file: {}", music_to_play), LogType::ERROR, __func__);
+        LOG(fmt::format("failed to initialize sound from file: {}", music_to_play), LogType::ERROR);
         return result;
     }
 
-    if (*random) {
+    if (config->isRandom()) {
         auto music = music_list->randomOut();
         if (!music) {
-            log(fmt::format("failed to get random music: {}", music_to_play), LogType::ERROR, __func__);
+            LOG(fmt::format("failed to get random music: {}", music_to_play), LogType::ERROR);
             return MA_ERROR;
         }
         music_list->headIn(music->getMusic());
     }
 
-    auto* user_data(new UserData(
-        engine,
-        sound_to_register,
-        sound_to_play,
-        quit_controller,
-        music_list,
-        music_playing,
-        random,
-        repetitive
-    ));
+    auto* user_data(
+        new UserData(engine, sound_to_register, sound_to_play, controller, music_list, music_playing, config)
+    );
 
     ma_sound_set_end_callback(sound_to_play->sound_.get(), soundAtEndCallback, user_data);
     result = ma_sound_start(sound_to_play->sound_.get());
     if (result != MA_SUCCESS) {
-        log(fmt::format("failed to start sound: {}", music_to_play), LogType::ERROR, __func__);
+        LOG(fmt::format("failed to start sound: {}", music_to_play), LogType::ERROR);
         return result;
     }
-    {
-        std::lock_guard<std::mutex> lock(sound_to_play->mtx_);
-        sound_to_play->playing_ = true;
-    }
-    log(fmt::format("started playing: {}", music_to_play), LogType::INFO, __func__);
+    // {
+    //     std::lock_guard<std::mutex> lock(sound_to_play->mtx_);
+    //     sound_to_play->playing_ = true;
+    // }
+    sound_to_play->playing_.store(true, std::memory_order_release);
+    LOG(fmt::format("started playing: {}", music_to_play), LogType::INFO);
     return MA_SUCCESS;
 }
 
-void cleanFunc(MaComponents* ma_comp, QuitController* quit_controller)
+void cleanFunc(MaComponents* ma_comp, Controller* controller)
 {
-    std::unique_lock<std::mutex> lock(quit_controller->mtx_);
     while (true) {
-        quit_controller->cv_.wait(lock, [quit_controller] {
-            return quit_controller->atEnd() || quit_controller->getQuitFlag();
-        });
-        if (quit_controller->getQuitFlag()) {
-            log("cleaner quit", LogType::INFO, __func__);
+        controller->flag_.wait(false, std::memory_order_acquire);
+        controller->flag_.clear(std::memory_order_release);
+
+        if (controller->getQuitFlag()) {
+            ma_comp->sound_to_play_->uninit();
+            LOG("uninitialized sound_to_play", LogType::INFO);
+
+            ma_comp->sound_to_register_->uninit();
+            LOG("uninitialized sound_to_register", LogType::INFO);
+
+            controller->cleaner_exited_.store(true, std::memory_order_release);
+            LOG("cleaner exited", LogType::INFO);
             return;
         }
-        if (!ma_comp->sound_to_play_->isPlaying() && ma_comp->sound_to_play_->isInitialized()) {
+        if (controller->atEnd()) {
+            if (!ma_comp->sound_to_play_->isPlaying() && ma_comp->sound_to_play_->isInitialized()) {
+                ma_comp->sound_to_play_->uninit();
+            }
+            if (!ma_comp->sound_to_register_->isPlaying() && ma_comp->sound_to_register_->isInitialized()) {
+                ma_comp->sound_to_register_->uninit();
+            }
+            controller->end_.store(false, std::memory_order_release);
+        }
+        if (controller->getError()) {
             ma_comp->sound_to_play_->uninit();
-        }
-        if (!ma_comp->sound_to_register_->isPlaying() && ma_comp->sound_to_register_->isInitialized()) {
             ma_comp->sound_to_register_->uninit();
+            controller->error_.store(false, std::memory_order_release);
         }
-        quit_controller->reset();
     }
 }
 
@@ -209,12 +250,12 @@ void soundAtEndCallback(void* user_data, ma_sound* sound)
 {
     auto* data = static_cast<UserData*>(user_data);
     if (!data) {
-        log("got an invalid user_data", LogType::ERROR, __func__);
+        LOG("got an invalid user_data", LogType::ERROR);
         throw std::runtime_error("got an invalid user_data");
     }
     const std::string& music_playing = *(data->music_playing_);
 
-    if (!*(data->repetitive_)) { data->music_list_->remove(music_playing); }
+    if (!(data->config_->isRepetitive())) { data->music_list_->remove(music_playing); }
     data->music_list_->tailIn(music_playing);
 
     const std::string MUSIC_TO_PLAY = data->music_list_->headOut()->getMusic();
@@ -226,15 +267,21 @@ void soundAtEndCallback(void* user_data, ma_sound* sound)
         data->music_playing_,
         data->music_list_,
         data->sound_to_register_,
-        data->quit_controller_,
-        data->random_,
-        data->repetitive_
+        data->controller_,
+        data->config_
     );
     if (result != MA_SUCCESS) {
-        log(fmt::format("failed to play music: {}", MUSIC_TO_PLAY), LogType::ERROR, __func__);
-        throw std::runtime_error("failed to play music");
+        LOG(fmt::format("failed to play music: {}", MUSIC_TO_PLAY), LogType::ERROR);
+        fmt::print("failed in soundAtEndCallback\n");
+        // data->sound_to_play_->uninit();
+        // data->sound_to_register_->uninit();
+        fmt::print("{}\n", data->sound_to_play_->isInitialized());
+        fmt::print("{}\n", data->sound_to_register_->isInitialized());
+        data->controller_->signalError();
     }
-    data->quit_controller_->signal();
+    else {
+        data->controller_->signalEnd();
+    }
     delete data;
 }
 
@@ -243,9 +290,10 @@ void soundInitNotificationCallback(ma_async_notification* notification)
     auto* sound_init_notification = static_cast<SoundInitNotification*>(notification);
     auto* data                    = static_cast<SoundPack*>(sound_init_notification->data_);
     if (!data) {
-        log("got an invalid data", LogType::ERROR, __func__);
+        LOG("got an invalid data", LogType::ERROR);
         throw std::runtime_error("got an invalid data");
     }
-    data->initialized_ = true;
-    log("sound initialized", LogType::INFO, __func__);
+
+    data->initialized_.store(true, std::memory_order_release);
+    LOG("initialized sound", LogType::INFO);
 }

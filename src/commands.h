@@ -20,13 +20,13 @@ class Progress
 namespace commands
 {
 
-void load(std::string_view list_path, MusicList* music_list, Config* config);
+void load(std::string_view list_name, MusicList* music_list, Config* config);
 ma_result play(
     MaComponents* ma_comp,
     std::string_view music_to_play,
     std::string* music_playing,
     MusicList* music_list,
-    QuitController* quit_controller,
+    Controller* controller,
     Config* config
 );
 
@@ -46,6 +46,6 @@ ma_result mute(ma_engine* engine);
 void setRandom(Config* config);
 void setRepetitive(Config* config);
 std::vector<std::string> getList(MusicList* music_list);
-void quit(MaComponents* ma_comp, QuitController* quit_controller);
+void quit(MaComponents* ma_comp, Controller* controller);
 
 } // namespace commands

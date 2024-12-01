@@ -8,7 +8,6 @@
 #include "utils.h"
 
 #include <algorithm>
-#include <cmath>
 #include <cstddef>
 #include <cstdlib>
 #include <memory>
@@ -20,21 +19,19 @@ void initMusicList(MusicList* music_list, Config* config)
 {
     if (DEFAULT_PLAY_LIST.empty()) {
         const std::string DEFAULT_LIST = utils::createTmpDefaultList();
-        music_list->load(DEFAULT_LIST, config);
+        music_list->load(DEFAULT_LIST);
         if (music_list->isEmpty()) {
-            log(fmt::format("failed to load default music list while user defined default music list is empty"),
-                LogType::ERROR,
-                __func__);
+            LOG(fmt::format("failed to load default music list while user defined default music list is empty"),
+                LogType::ERROR);
             throw std::runtime_error("failed to load default music list");
         }
-        utils::deleteTmpDefaultList();
+        utils::deleteTmpFiles();
     }
     else {
-        music_list->load(fmt::format("{}{}", config->getPlayListPath(), DEFAULT_PLAY_LIST), config);
+        music_list->load(fmt::format("{}{}", config->getPlayListPath(), DEFAULT_PLAY_LIST));
         if (music_list->isEmpty()) {
-            log(fmt::format("failed to load music list {}{}", config->getPlayListPath(), DEFAULT_PLAY_LIST),
-                LogType::ERROR,
-                __func__);
+            LOG(fmt::format("failed to load music list {}{}", config->getPlayListPath(), DEFAULT_PLAY_LIST),
+                LogType::ERROR);
             throw std::runtime_error("failed to load default music list");
         }
     }
@@ -64,7 +61,7 @@ void sendMsgToClient(std::string_view msg, NamedPipe* pipe_to_server, NamedPipe*
 void sendMsgToClient(const std::vector<std::string>* msg, NamedPipe* pipe_to_server, NamedPipe* pipe_to_client)
 {
     if (msg->size() == 0) {
-        log("got an empty message", LogType::ERROR, __func__);
+        LOG("got an empty message", LogType::ERROR);
         return;
     }
     pipe_to_server->openPipe(OpenMode::RD_ONLY_BLOCK);
@@ -113,7 +110,7 @@ static std::vector<std::string> parseCommand(std::string& cmd)
 
 static void logErrorAndSendToClient(std::string_view err, NamedPipe* pipe_to_server, NamedPipe* pipe_to_client)
 {
-    log(err, LogType::ERROR, __func__);
+    LOG(err, LogType::ERROR);
     sendMsgToClient(err, pipe_to_server, pipe_to_client);
 }
 
@@ -124,7 +121,7 @@ void handleCommand(
     MaComponents* ma_comp,
     std::string* music_playing,
     MusicList* music_list,
-    QuitController* quit_controller,
+    Controller* controller,
     Config* config
 )
 {
@@ -142,8 +139,7 @@ void handleCommand(
     else if (sub_cmd == PLAY || std::ranges::find(COMMANDS.at(PLAY), sub_cmd) != COMMANDS.at(PLAY).end()) {
         if (args.size() >= 2) {
             const std::string& music_to_play = args.at(1);
-            ma_result result =
-                commands::play(ma_comp, music_to_play, music_playing, music_list, quit_controller, config);
+            ma_result result = commands::play(ma_comp, music_to_play, music_playing, music_list, controller, config);
             if (result != MA_SUCCESS) {
                 logErrorAndSendToClient(
                     fmt::format("Failed to play music: {}", music_to_play),
@@ -157,8 +153,7 @@ void handleCommand(
         }
         else {
             const std::string& music_to_play = music_list->headOut()->getMusic();
-            ma_result result =
-                commands::play(ma_comp, music_to_play, music_playing, music_list, quit_controller, config);
+            ma_result result = commands::play(ma_comp, music_to_play, music_playing, music_list, controller, config);
             if (result != MA_SUCCESS) {
                 logErrorAndSendToClient(
                     fmt::format("Failed to play music: {}", music_to_play),
@@ -336,7 +331,7 @@ void handleCommand(
         sendMsgToClient(&list, pipe_to_server, pipe_to_client);
     }
     else if (sub_cmd == QUIT || std::ranges::find(COMMANDS.at(QUIT), sub_cmd) != COMMANDS.at(QUIT).end()) {
-        commands::quit(ma_comp, quit_controller);
+        commands::quit(ma_comp, controller);
         sendMsgToClient("Server quit successfully", pipe_to_server, pipe_to_client);
     }
     else {
@@ -358,19 +353,19 @@ void server()
     auto music_list = std::make_unique<MusicList>();
     initMusicList(music_list.get(), config.get()); // throw fatal error
 
-    auto music_playing   = std::make_unique<std::string>();
-    auto quit_controller = std::make_unique<QuitController>();
+    auto music_playing = std::make_unique<std::string>();
+    auto controller    = std::make_unique<Controller>();
 
-    std::thread cleaner(cleanFunc, ma_comp.get(), quit_controller.get());
+    std::thread cleaner(cleanFunc, ma_comp.get(), controller.get());
     cleaner.detach();
 
     std::string cmd;
     std::vector<std::string> args;
-    while (!quit_controller->getQuitFlag()) {
+    while (!controller->getQuitFlag()) {
         args.clear();
         cmd = getCommand(pipe_to_server.get(), pipe_to_client.get()); // throw fatal error
         if (cmd == "") {
-            log("failed to get command", LogType::ERROR, __func__);
+            LOG("failed to get command", LogType::ERROR);
             continue;
         }
 
@@ -381,7 +376,7 @@ void server()
             ma_comp.get(),
             music_playing.get(),
             music_list.get(),
-            quit_controller.get(),
+            controller.get(),
             config.get()
         ); // throw fatal error
     }

@@ -15,43 +15,6 @@ const std::string INFO_LOG_FILE  = fmt::format("{}/{}", RUNTIME_PATH, "info.log"
 const std::string PIPE_TO_SERVER = fmt::format("{}/{}", RUNTIME_PATH, "pipe_to_server");
 const std::string PIPE_TO_CLIENT = fmt::format("{}/{}", RUNTIME_PATH, "pipe_to_client");
 
-const std::string VERSION = "0.0.1";
-const std::string DOC     = "USIC DOCUMENT:\n"
-                            "Server:\n"
-                            "  usic [FLAGS]\n"
-                            "  usic                Run server\n"
-                            "Available FLAGS:\n"
-                            "  -h, --help          Print this document\n"
-                            "  -v, --version       Print version\n"
-                            "\n"
-                            "Client:\n"
-                            "  usic <COMMAND> [ARGUMENT]\n"
-                            "Available COMMANDS:\n"
-                            "  load                  Load playlist                REQUIRED ARGUMENT: "
-                            "The path of playlist file\n"
-                            "  play                  Play music                   OPTIONAL ARGUMENT: "
-                            "The path of music file; plays first in playlist if not provided\n"
-                            "  play_later            Play given music next        REQUIRED ARGUMENT: "
-                            "The path of music file\n"
-                            "  play_next             Play next music in playlist  NO ARGUMENT\n"
-                            "  play_prev             Play previous music          NO ARGUMENT\n"
-                            "  pause                 Pause or resume music        NO ARGUMENT\n"
-                            "  cursor_forward        Move cursor forward          NO ARGUMENT\n"
-                            "  cursor_backward       Move cursor backward         NO ARGUMENT\n"
-                            "  set_cursor            Set cursor to given time     REQUIRED ARGUMENT: "
-                            "Time in MM:SS format\n"
-                            "  get_current_progress  Get current progress         NO ARGUMENT\n"
-                            "  volume_up             Increase volume              NO ARGUMENT\n"
-                            "  volume_down           Decrease volume              NO ARGUMENT\n"
-                            "  set_volume            Set volume                   REQUIRED ARGUMENT: "
-                            "Volume between 0.0 and 1.0\n"
-                            "  get_volume            Get current volume           NO ARGUMENT\n"
-                            "  mute                  Mute or unmute volume        NO ARGUMENT\n"
-                            "  set_random            Toggle random mode           NO ARGUMENT\n"
-                            "  set_repetitive        Toggle repetitive mode       NO ARGUMENT\n"
-                            "  get_list              Print playlist               NO ARGUMENT\n"
-                            "  quit                  Quit server                  NO ARGUMENT\n";
-
 enum class LogType
 {
     ERROR,
@@ -95,8 +58,6 @@ class Config
     Config(bool repetitive, bool random, std::string_view usic_library, std::string_view play_list_path);
     bool isRepetitive();
     bool isRandom();
-    bool* getRepetitivePtr();
-    bool* getRandomPtr();
     void toggleRandom();
     void toggleRepetitive();
     std::string getUsicLibrary();
@@ -111,4 +72,6 @@ class Config
 
 bool isServerRunning();
 void setupRuntime(NamedPipe* pipe_to_server, NamedPipe* pipe_to_client);
-void log(std::string_view message, LogType type, std::string_view func_name);
+
+#define LOG(message, type) log(message, type, std::string_view{__FILE__}, __LINE__, std::string_view{__func__})
+void log(std::string_view message, LogType type, std::string_view file, int line, std::string_view func);
