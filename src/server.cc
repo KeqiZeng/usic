@@ -7,7 +7,6 @@
 #include "runtime.h"
 #include "utils.h"
 
-#include <algorithm>
 #include <cstddef>
 #include <cstdlib>
 #include <memory>
@@ -126,7 +125,7 @@ void handleCommand(
 {
     std::vector<std::string> args = parseCommand(cmd);
     const std::string& sub_cmd    = args.at(0);
-    if (sub_cmd == LOAD || std::ranges::find(COMMANDS.at(LOAD), sub_cmd) != COMMANDS.at(LOAD).end()) {
+    if (utils::commandEq(sub_cmd, LOAD)) {
         if (args.size() >= 2) {
             commands::load(args.at(1), music_list, config);
             sendMsgToClient(NO_MESSAGE, pipe_to_server, pipe_to_client);
@@ -135,7 +134,7 @@ void handleCommand(
             logErrorAndSendToClient(fmt::format("{}: not enough arguments.", LOAD), pipe_to_server, pipe_to_client);
         }
     }
-    else if (sub_cmd == PLAY || std::ranges::find(COMMANDS.at(PLAY), sub_cmd) != COMMANDS.at(PLAY).end()) {
+    else if (utils::commandEq(sub_cmd, PLAY)) {
         if (args.size() >= 2) {
             const std::string& music_to_play = args.at(1);
             ma_result result = commands::play(ma_comp, music_to_play, music_playing, music_list, controller, config);
@@ -165,8 +164,7 @@ void handleCommand(
             }
         }
     }
-    else if (sub_cmd == PLAY_LATER ||
-             std::ranges::find(COMMANDS.at(PLAY_LATER), sub_cmd) != COMMANDS.at(PLAY_LATER).end()) {
+    else if (utils::commandEq(sub_cmd, PLAY_LATER)) {
         if (args.size() >= 2) {
             const std::string& music_to_play = args.at(1);
             commands::playLater(config, music_to_play, music_list);
@@ -180,8 +178,7 @@ void handleCommand(
             );
         }
     }
-    else if (sub_cmd == PLAY_NEXT ||
-             std::ranges::find(COMMANDS.at(PLAY_NEXT), sub_cmd) != COMMANDS.at(PLAY_NEXT).end()) {
+    else if (utils::commandEq(sub_cmd, PLAY_NEXT)) {
         ma_result result = commands::playNext(ma_comp);
         if (result != MA_SUCCESS) {
             logErrorAndSendToClient("Failed to play next music", pipe_to_server, pipe_to_client);
@@ -190,8 +187,7 @@ void handleCommand(
             sendMsgToClient(NO_MESSAGE, pipe_to_server, pipe_to_client);
         }
     }
-    else if (sub_cmd == PLAY_PREV ||
-             std::ranges::find(COMMANDS.at(PLAY_PREV), sub_cmd) != COMMANDS.at(PLAY_PREV).end()) {
+    else if (utils::commandEq(sub_cmd, PLAY_PREV)) {
         ma_result result = commands::playPrev(ma_comp, music_list);
         if (result != MA_SUCCESS) {
             logErrorAndSendToClient("Failed to play prev music", pipe_to_server, pipe_to_client);
@@ -200,7 +196,7 @@ void handleCommand(
             sendMsgToClient(NO_MESSAGE, pipe_to_server, pipe_to_client);
         }
     }
-    else if (sub_cmd == PAUSE || std::ranges::find(COMMANDS.at(PAUSE), sub_cmd) != COMMANDS.at(PAUSE).end()) {
+    else if (utils::commandEq(sub_cmd, PAUSE)) {
         ma_result result = commands::pause(ma_comp);
         if (result != MA_SUCCESS) {
             logErrorAndSendToClient("Failed to pause/resume music", pipe_to_server, pipe_to_client);
@@ -209,8 +205,7 @@ void handleCommand(
             sendMsgToClient(NO_MESSAGE, pipe_to_server, pipe_to_client);
         }
     }
-    else if (sub_cmd == CURSOR_FORWARD ||
-             std::ranges::find(COMMANDS.at(CURSOR_FORWARD), sub_cmd) != COMMANDS.at(CURSOR_FORWARD).end()) {
+    else if (utils::commandEq(sub_cmd, CURSOR_FORWARD)) {
         ma_result result = commands::cursorForward(ma_comp);
         if (result != MA_SUCCESS) {
             logErrorAndSendToClient("Failed to move cursor forward", pipe_to_server, pipe_to_client);
@@ -219,8 +214,7 @@ void handleCommand(
             sendMsgToClient(NO_MESSAGE, pipe_to_server, pipe_to_client);
         }
     }
-    else if (sub_cmd == CURSOR_BACKWARD ||
-             std::ranges::find(COMMANDS.at(CURSOR_BACKWARD), sub_cmd) != COMMANDS.at(CURSOR_BACKWARD).end()) {
+    else if (utils::commandEq(sub_cmd, CURSOR_BACKWARD)) {
         ma_result result = commands::cursorBackward(ma_comp);
         if (result != MA_SUCCESS) {
             logErrorAndSendToClient("Failed to move cursor backward", pipe_to_server, pipe_to_client);
@@ -229,8 +223,7 @@ void handleCommand(
             sendMsgToClient(NO_MESSAGE, pipe_to_server, pipe_to_client);
         }
     }
-    else if (sub_cmd == SET_CURSOR ||
-             std::ranges::find(COMMANDS.at(SET_CURSOR), sub_cmd) != COMMANDS.at(SET_CURSOR).end()) {
+    else if (utils::commandEq(sub_cmd, SET_CURSOR)) {
         if (args.size() >= 2) {
             const std::string& time = args.at(1);
             ma_result result        = commands::setCursor(ma_comp, time);
@@ -242,8 +235,7 @@ void handleCommand(
             }
         }
     }
-    else if (sub_cmd == GET_PROGRESS ||
-             std::ranges::find(COMMANDS.at(GET_PROGRESS), sub_cmd) != COMMANDS.at(GET_PROGRESS).end()) {
+    else if (utils::commandEq(sub_cmd, GET_PROGRESS)) {
         auto progress    = std::make_unique<Progress>();
         ma_result result = commands::getProgress(ma_comp, *music_playing, progress.get());
         if (result != MA_SUCCESS) { logErrorAndSendToClient("Failed to get progress", pipe_to_server, pipe_to_client); }
@@ -251,8 +243,7 @@ void handleCommand(
             sendMsgToClient(progress->makeBar(), pipe_to_server, pipe_to_client);
         }
     }
-    else if (sub_cmd == VOLUME_UP ||
-             std::ranges::find(COMMANDS.at(VOLUME_UP), sub_cmd) != COMMANDS.at(VOLUME_UP).end()) {
+    else if (utils::commandEq(sub_cmd, VOLUME_UP)) {
         ma_result result = commands::volumeUp(ma_comp->engine_.get());
         if (result != MA_SUCCESS) {
             logErrorAndSendToClient("Failed to turn the volume up", pipe_to_server, pipe_to_client);
@@ -261,8 +252,7 @@ void handleCommand(
             sendMsgToClient(NO_MESSAGE, pipe_to_server, pipe_to_client);
         }
     }
-    else if (sub_cmd == VOLUME_DOWN ||
-             std::ranges::find(COMMANDS.at(VOLUME_DOWN), sub_cmd) != COMMANDS.at(VOLUME_DOWN).end()) {
+    else if (utils::commandEq(sub_cmd, VOLUME_DOWN)) {
         ma_result result = commands::volumeDown(ma_comp->engine_.get());
         if (result != MA_SUCCESS) {
             logErrorAndSendToClient("Failed to turn the volume down", pipe_to_server, pipe_to_client);
@@ -271,8 +261,7 @@ void handleCommand(
             sendMsgToClient(NO_MESSAGE, pipe_to_server, pipe_to_client);
         }
     }
-    else if (sub_cmd == SET_VOLUME ||
-             std::ranges::find(COMMANDS.at(SET_VOLUME), sub_cmd) != COMMANDS.at(SET_VOLUME).end()) {
+    else if (utils::commandEq(sub_cmd, SET_VOLUME)) {
         if (args.size() >= 2) {
             const std::string& volume = args.at(1);
             ma_result result          = commands::setVolume(ma_comp->engine_.get(), volume);
@@ -291,8 +280,7 @@ void handleCommand(
             );
         }
     }
-    else if (sub_cmd == GET_VOLUME ||
-             std::ranges::find(COMMANDS.at(GET_VOLUME), sub_cmd) != COMMANDS.at(GET_VOLUME).end()) {
+    else if (utils::commandEq(sub_cmd, GET_VOLUME)) {
         float volume     = -1;
         ma_result result = commands::getVolume(ma_comp->engine_.get(), &volume);
         if (result != MA_SUCCESS) { logErrorAndSendToClient("Failed to get volume", pipe_to_server, pipe_to_client); }
@@ -300,15 +288,14 @@ void handleCommand(
             sendMsgToClient(fmt::format("Volume: {}", volume), pipe_to_server, pipe_to_client);
         }
     }
-    else if (sub_cmd == MUTE || std::ranges::find(COMMANDS.at(MUTE), sub_cmd) != COMMANDS.at(MUTE).end()) {
+    else if (utils::commandEq(sub_cmd, MUTE)) {
         ma_result result = commands::mute(ma_comp->engine_.get());
         if (result != MA_SUCCESS) { logErrorAndSendToClient("Failed to (un)mute", pipe_to_server, pipe_to_client); }
         else {
             sendMsgToClient(NO_MESSAGE, pipe_to_server, pipe_to_client);
         }
     }
-    else if (sub_cmd == SET_RANDOM ||
-             std::ranges::find(COMMANDS.at(SET_RANDOM), sub_cmd) != COMMANDS.at(SET_RANDOM).end()) {
+    else if (utils::commandEq(sub_cmd, SET_RANDOM)) {
         commands::setRandom(config);
         sendMsgToClient(
             fmt::format("random: {}", config->isRandom() ? "enabled" : "disabled"),
@@ -316,8 +303,7 @@ void handleCommand(
             pipe_to_client
         );
     }
-    else if (sub_cmd == SET_REPETITIVE ||
-             std::ranges::find(COMMANDS.at(SET_REPETITIVE), sub_cmd) != COMMANDS.at(SET_REPETITIVE).end()) {
+    else if (utils::commandEq(sub_cmd, SET_REPETITIVE)) {
         commands::setRepetitive(config);
         sendMsgToClient(
             fmt::format("repetitive: {}", config->isRepetitive() ? "enabled" : "disabled"),
@@ -325,11 +311,11 @@ void handleCommand(
             pipe_to_client
         );
     }
-    else if (sub_cmd == GET_LIST || std::ranges::find(COMMANDS.at(GET_LIST), sub_cmd) != COMMANDS.at(GET_LIST).end()) {
+    else if (utils::commandEq(sub_cmd, GET_LIST)) {
         std::vector<std::string> list = commands::getList(music_list);
         sendMsgToClient(&list, pipe_to_server, pipe_to_client);
     }
-    else if (sub_cmd == QUIT || std::ranges::find(COMMANDS.at(QUIT), sub_cmd) != COMMANDS.at(QUIT).end()) {
+    else if (utils::commandEq(sub_cmd, QUIT)) {
         commands::quit(ma_comp, controller);
         sendMsgToClient("Server quit successfully", pipe_to_server, pipe_to_client);
     }

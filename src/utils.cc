@@ -159,17 +159,17 @@ std::optional<int> timeStrToSec(std::string_view time_str)
     if (min < 0) { return std::nullopt; }
 
     // seconds should be 0-60
-    if (sec < 0 || sec > SECONDS_PER_MINUTE) { return -1; }
+    if (sec < 0 || sec > 60) { return -1; }
 
-    return min * SECONDS_PER_MINUTE + sec;
+    return min * 60 + sec;
 }
 
 std::optional<std::string> secToTimeStr(int seconds)
 {
     if (seconds < 0) { return std::nullopt; }
 
-    int min = seconds / SECONDS_PER_MINUTE;
-    int sec = seconds % SECONDS_PER_MINUTE;
+    int min = seconds / 60;
+    int sec = seconds % 60;
 
     return fmt::format("{:d}:{:02d}", min, sec);
 }
@@ -179,6 +179,11 @@ std::optional<std::string> removeExt(const std::string& music_name)
     std::filesystem::path path(music_name);
     if (path.empty() || !path.has_filename() || !path.has_extension()) { return std::nullopt; }
     return path.stem().string();
+}
+
+bool commandEq(const std::string& command, const std::string& target)
+{
+    return (command == target || std::ranges::find(COMMANDS.at(target), command) != COMMANDS.at(target).end());
 }
 
 } // namespace utils

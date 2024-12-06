@@ -4,7 +4,6 @@
 #include <string>
 #include <string_view>
 
-const int SECONDS_PER_MINUTE = 60;
 namespace utils
 {
 
@@ -22,5 +21,6 @@ void removeTmpFiles();
 std::optional<int> timeStrToSec(std::string_view time_str);
 std::optional<std::string> secToTimeStr(int seconds);
 std::optional<std::string> removeExt(const std::string& music_name);
+bool commandEq(const std::string& command, const std::string& target);
 
 } // namespace utils

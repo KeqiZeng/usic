@@ -12,6 +12,7 @@
 #include "runtime.h"
 #include "server.h"
 #include "tools.h"
+#include "utils.h"
 
 /* marcos */
 #define MA_ENABLE_ONLY_SPECIFIC_BACKENDS
@@ -32,16 +33,11 @@ bool flagOrTool(int argc, char* argv[])
             args.push_back(argv[i]);
         }
 
-        if (args[0] == PRINT_VERSION ||
-            std::ranges::find(COMMANDS.at(PRINT_VERSION), args[0]) != COMMANDS.at(PRINT_VERSION).end()) {
-            fmt::print("{}\n", VERSION);
-        }
-        else if (args[0] == PRINT_HELP ||
-                 std::ranges::find(COMMANDS.at(PRINT_HELP), args[0]) != COMMANDS.at(PRINT_HELP).end()) {
+        if (utils::commandEq(args[0], PRINT_VERSION)) { fmt::print("{}\n", VERSION); }
+        else if (utils::commandEq(args[0], PRINT_HELP)) {
             fmt::print("{}\n", DOC);
         }
-        else if (args[0] == ADD_MUSIC_TO_LIST ||
-                 std::ranges::find(COMMANDS.at(ADD_MUSIC_TO_LIST), args[0]) != COMMANDS.at(ADD_MUSIC_TO_LIST).end()) {
+        else if (utils::commandEq(args[0], ADD_MUSIC_TO_LIST)) {
             if (args.size() < 2) { fmt::print(stderr, "not enough arguments\n"); }
             auto config = std::make_unique<Config>(
                 REPETITIVE,
@@ -51,8 +47,7 @@ bool flagOrTool(int argc, char* argv[])
             ); // throw fatal error
             tools::addMusicToList(args[1], config.get());
         }
-        else if (args[0] == FUZZY_PLAY ||
-                 std::ranges::find(COMMANDS.at(FUZZY_PLAY), args[0]) != COMMANDS.at(FUZZY_PLAY).end()) {
+        else if (utils::commandEq(args[0], FUZZY_PLAY)) {
             auto config = std::make_unique<Config>(
                 REPETITIVE,
                 RANDOM,
