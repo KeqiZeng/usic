@@ -67,7 +67,7 @@ ma_result play(
         LOG("got an invalid MaComponents", LogType::ERROR);
         return MA_ERROR;
     }
-    if (!ma_comp->sound_to_play_->isInitialized() && !ma_comp->sound_to_register_->isInitialized()) {
+    if (!ma_comp->sound_to_play_->isPlaying() && !ma_comp->sound_to_register_->isPlaying()) {
         result = playInternal(
             ma_comp->engine_.get(),
             ma_comp->sound_to_play_.get(),
