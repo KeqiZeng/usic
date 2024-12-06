@@ -15,6 +15,7 @@ release:
 
 test:
 	@cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON
+	@cmake --build build
 	@./build/tests/${PROJECT_NAME}_tests
 
 install:
