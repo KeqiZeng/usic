@@ -25,7 +25,6 @@ void initMusicList(MusicList* music_list, Config* config)
                 LogType::ERROR);
             throw std::runtime_error("failed to load default music list");
         }
-        utils::deleteTmpFiles();
     }
     else {
         music_list->load(fmt::format("{}{}", config->getPlayListPath(), DEFAULT_PLAY_LIST));

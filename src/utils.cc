@@ -126,7 +126,7 @@ bool isLineInFile(std::string_view line, std::string_view file_name)
     return false;
 }
 
-void deleteTmpFiles()
+void removeTmpFiles()
 {
     const auto TMP_DIR = std::filesystem::temp_directory_path();
     for (const auto& entry : std::filesystem::directory_iterator(TMP_DIR)) {

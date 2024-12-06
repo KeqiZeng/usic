@@ -24,7 +24,7 @@
 // miniaudio should be included after MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
 
-bool handleFlagOrCommand(int argc, char* argv[])
+bool flagOrTool(int argc, char* argv[])
 {
     if (argc > 1) {
         std::vector<std::string> args;
@@ -50,6 +50,16 @@ bool handleFlagOrCommand(int argc, char* argv[])
                 PLAY_LISTS_PATH
             ); // throw fatal error
             tools::addMusicToList(args[1], config.get());
+        }
+        else if (args[0] == FUZZY_PLAY ||
+                 std::ranges::find(COMMANDS.at(FUZZY_PLAY), args[0]) != COMMANDS.at(FUZZY_PLAY).end()) {
+            auto config = std::make_unique<Config>(
+                REPETITIVE,
+                RANDOM,
+                USIC_LIBRARY,
+                PLAY_LISTS_PATH
+            ); // throw fatal error
+            tools::fuzzyPlay(argv[0], config.get());
         }
         else {
             return false;
@@ -97,7 +107,7 @@ int main(int argc, char* argv[])
     }
 
     try {
-        if (handleFlagOrCommand(argc, argv)) { return 0; }
+        if (flagOrTool(argc, argv)) { return 0; }
     }
     catch (std::exception& e) {
         return FATAL_ERROR;

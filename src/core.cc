@@ -2,6 +2,7 @@
 #include "fmt/core.h"
 #include "music_list.h"
 #include "runtime.h"
+#include "utils.h"
 #include <atomic>
 #include <cstdlib>
 #include <memory>
@@ -171,10 +172,6 @@ ma_result playInternal(
 {
     *music_playing = music_to_play;
 
-    // {
-    //     std::lock_guard<std::mutex> lock(sound_to_register->mtx_);
-    //     sound_to_register->playing_ = false;
-    // }
     sound_to_register->playing_.store(false, std::memory_order_release);
 
     ma_result result =
@@ -203,10 +200,6 @@ ma_result playInternal(
         LOG(fmt::format("failed to start sound: {}", music_to_play), LogType::ERROR);
         return result;
     }
-    // {
-    //     std::lock_guard<std::mutex> lock(sound_to_play->mtx_);
-    //     sound_to_play->playing_ = true;
-    // }
     sound_to_play->playing_.store(true, std::memory_order_release);
     LOG(fmt::format("started playing: {}", music_to_play), LogType::INFO);
     return MA_SUCCESS;
@@ -224,6 +217,9 @@ void cleanFunc(MaComponents* ma_comp, Controller* controller)
 
             ma_comp->sound_to_register_->uninit();
             LOG("uninitialized sound_to_register", LogType::INFO);
+
+            utils::removeTmpFiles();
+            LOG("removed tmp files", LogType::INFO);
 
             controller->cleaner_exited_.store(true, std::memory_order_release);
             LOG("cleaner exited", LogType::INFO);
