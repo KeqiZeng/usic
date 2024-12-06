@@ -361,24 +361,30 @@ void server()
 
     std::string cmd;
     std::vector<std::string> args;
-    while (!controller->getQuitFlag()) {
-        args.clear();
-        cmd = getCommand(pipe_to_server.get(), pipe_to_client.get()); // throw fatal error
-        if (cmd == "") {
-            LOG("failed to get command", LogType::ERROR);
-            continue;
-        }
+    try {
+        while (!controller->getQuitFlag()) {
+            args.clear();
+            cmd = getCommand(pipe_to_server.get(), pipe_to_client.get()); // throw fatal error
+            if (cmd == "") {
+                LOG("failed to get command", LogType::ERROR);
+                continue;
+            }
 
-        handleCommand(
-            cmd,
-            pipe_to_server.get(),
-            pipe_to_client.get(),
-            ma_comp.get(),
-            music_playing.get(),
-            music_list.get(),
-            controller.get(),
-            config.get()
-        ); // throw fatal error
+            handleCommand(
+                cmd,
+                pipe_to_server.get(),
+                pipe_to_client.get(),
+                ma_comp.get(),
+                music_playing.get(),
+                music_list.get(),
+                controller.get(),
+                config.get()
+            ); // throw fatal error
+        }
+    }
+    catch (std::exception& e) {
+        controller->quit();
+        throw std::runtime_error(e.what());
     }
     pipe_to_server->deletePipe();
     pipe_to_client->deletePipe();

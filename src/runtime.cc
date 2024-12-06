@@ -32,7 +32,6 @@ void NamedPipe::setup()
         // if named pipe exists, delete it for initialization
         if (unlink(this->PIPE_PATH_.data()) == -1) {
             LOG(fmt::format("failed to delete named pipe {}", this->PIPE_PATH_), LogType::ERROR);
-            // return FATAL_ERROR;
             throw std::runtime_error("failed to delete named pipe");
         }
     }
@@ -42,7 +41,6 @@ void NamedPipe::setup()
         throw std::runtime_error("failed to create named pipe");
     }
     LOG(fmt::format("created named pipe {}", this->PIPE_PATH_), LogType::INFO);
-    // return 0;
 }
 
 void NamedPipe::openPipe(OpenMode open_mode)
@@ -79,9 +77,7 @@ void NamedPipe::writeIn(std::string_view msg)
     }
 
     ssize_t bytes_written = write(this->fd_, msg.data(), msg.size());
-    if (bytes_written == -1) {
-        LOG(fmt::format("failed to write to named pipe {}", this->PIPE_PATH_), LogType::ERROR);
-    }
+    if (bytes_written == -1) { LOG(fmt::format("failed to write to named pipe {}", this->PIPE_PATH_), LogType::ERROR); }
 }
 
 std::string NamedPipe::readOut()
@@ -95,6 +91,7 @@ std::string NamedPipe::readOut()
     ssize_t bytes_read = read(this->fd_, msg.data(), 1024);
     if (bytes_read == -1) {
         LOG(fmt::format("failed to read from named pipe {}", this->PIPE_PATH_), LogType::ERROR);
+        return "";
     }
     else {
         msg.resize(bytes_read);
