@@ -14,7 +14,7 @@ const std::string concatenateArgs(int argc, char* argv[])
 
         // check if the argument contains spaces
         if (arg.find(' ') != std::string::npos) {
-            result += "\"" + arg + "\""; // add quotes
+            result += "\"" + arg + "\"";
         }
         else {
             result += arg;
@@ -45,8 +45,12 @@ void client(int argc, char* argv[])
     while (true) {
         msg = pipe_to_client->readOut();
         if (msg != "") {
-            if (msg == OVER) { break; }
-            if (msg != NO_MESSAGE) { fmt::print("{}\n", msg); }
+            if (msg == OVER) {
+                break;
+            }
+            if (msg != NO_MESSAGE) {
+                fmt::print("{}\n", msg);
+            }
             pipe_to_server->writeIn(GOT);
         }
     }

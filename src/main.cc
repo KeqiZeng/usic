@@ -33,12 +33,16 @@ bool flagOrTool(int argc, char* argv[])
             args.push_back(argv[i]);
         }
 
-        if (utils::commandEq(args[0], PRINT_VERSION)) { fmt::print("{}\n", VERSION); }
+        if (utils::commandEq(args[0], PRINT_VERSION)) {
+            fmt::print("{}\n", VERSION);
+        }
         else if (utils::commandEq(args[0], PRINT_HELP)) {
             fmt::print("{}\n", DOC);
         }
         else if (utils::commandEq(args[0], ADD_MUSIC_TO_LIST)) {
-            if (args.size() < 2) { fmt::print(stderr, "not enough arguments\n"); }
+            if (args.size() < 2) {
+                fmt::print(stderr, "not enough arguments\n");
+            }
             auto config = std::make_unique<Config>(
                 REPETITIVE,
                 RANDOM,
@@ -102,7 +106,9 @@ int main(int argc, char* argv[])
     }
 
     try {
-        if (flagOrTool(argc, argv)) { return 0; }
+        if (flagOrTool(argc, argv)) {
+            return 0;
+        }
     }
     catch (std::exception& e) {
         return FATAL_ERROR;

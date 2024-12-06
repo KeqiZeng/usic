@@ -87,7 +87,8 @@ const std::string createTmpDefaultList()
     }
 
     for (const auto& entry : std::filesystem::recursive_directory_iterator(USIC_LIBRARY)) {
-        if (!entry.is_regular_file()) continue;
+        if (!entry.is_regular_file())
+            continue;
 
         std::string ext = entry.path().extension().string();
         std::ranges::transform(ext, ext.begin(), ::tolower);
@@ -130,7 +131,8 @@ void removeTmpFiles()
 {
     const auto TMP_DIR = std::filesystem::temp_directory_path();
     for (const auto& entry : std::filesystem::directory_iterator(TMP_DIR)) {
-        if (!entry.is_regular_file()) continue;
+        if (!entry.is_regular_file())
+            continue;
 
         const std::string FILENAME = entry.path().filename().string();
         if (FILENAME.starts_with("usic_") && FILENAME.ends_with(".txt")) {
@@ -156,17 +158,23 @@ std::optional<int> timeStrToSec(std::string_view time_str)
     }
 
     // minutes should not be less than 0
-    if (min < 0) { return std::nullopt; }
+    if (min < 0) {
+        return std::nullopt;
+    }
 
     // seconds should be 0-60
-    if (sec < 0 || sec > 60) { return -1; }
+    if (sec < 0 || sec > 60) {
+        return -1;
+    }
 
     return min * 60 + sec;
 }
 
 std::optional<std::string> secToTimeStr(int seconds)
 {
-    if (seconds < 0) { return std::nullopt; }
+    if (seconds < 0) {
+        return std::nullopt;
+    }
 
     int min = seconds / 60;
     int sec = seconds % 60;
@@ -177,7 +185,9 @@ std::optional<std::string> secToTimeStr(int seconds)
 std::optional<std::string> removeExt(const std::string& music_name)
 {
     std::filesystem::path path(music_name);
-    if (path.empty() || !path.has_filename() || !path.has_extension()) { return std::nullopt; }
+    if (path.empty() || !path.has_filename() || !path.has_extension()) {
+        return std::nullopt;
+    }
     return path.stem().string();
 }
 

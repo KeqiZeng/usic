@@ -51,7 +51,9 @@ void sendMsgToClient(std::string_view msg, NamedPipe* pipe_to_server, NamedPipe*
     pipe_to_server->openPipe(OpenMode::RD_ONLY_BLOCK);
     pipe_to_client->openPipe(OpenMode::WR_ONLY_BLOCK);
     pipe_to_client->writeIn(msg);
-    if (pipe_to_server->readOut() == GOT) { pipe_to_client->writeIn(OVER); }
+    if (pipe_to_server->readOut() == GOT) {
+        pipe_to_client->writeIn(OVER);
+    }
     pipe_to_server->closePipe();
     pipe_to_client->closePipe();
 }
@@ -101,7 +103,9 @@ static std::vector<std::string> parseCommand(std::string& cmd)
         }
     }
 
-    if (!current.empty()) { args.push_back(current); }
+    if (!current.empty()) {
+        args.push_back(current);
+    }
 
     return args;
 }
@@ -238,7 +242,9 @@ void handleCommand(
     else if (utils::commandEq(sub_cmd, GET_PROGRESS)) {
         auto progress    = std::make_unique<Progress>();
         ma_result result = commands::getProgress(ma_comp, *music_playing, progress.get());
-        if (result != MA_SUCCESS) { logErrorAndSendToClient("Failed to get progress", pipe_to_server, pipe_to_client); }
+        if (result != MA_SUCCESS) {
+            logErrorAndSendToClient("Failed to get progress", pipe_to_server, pipe_to_client);
+        }
         else {
             sendMsgToClient(progress->makeBar(), pipe_to_server, pipe_to_client);
         }
@@ -283,14 +289,18 @@ void handleCommand(
     else if (utils::commandEq(sub_cmd, GET_VOLUME)) {
         float volume     = -1;
         ma_result result = commands::getVolume(ma_comp->engine_.get(), &volume);
-        if (result != MA_SUCCESS) { logErrorAndSendToClient("Failed to get volume", pipe_to_server, pipe_to_client); }
+        if (result != MA_SUCCESS) {
+            logErrorAndSendToClient("Failed to get volume", pipe_to_server, pipe_to_client);
+        }
         else {
             sendMsgToClient(fmt::format("Volume: {}", volume), pipe_to_server, pipe_to_client);
         }
     }
     else if (utils::commandEq(sub_cmd, MUTE)) {
         ma_result result = commands::mute(ma_comp->engine_.get());
-        if (result != MA_SUCCESS) { logErrorAndSendToClient("Failed to (un)mute", pipe_to_server, pipe_to_client); }
+        if (result != MA_SUCCESS) {
+            logErrorAndSendToClient("Failed to (un)mute", pipe_to_server, pipe_to_client);
+        }
         else {
             sendMsgToClient(NO_MESSAGE, pipe_to_server, pipe_to_client);
         }

@@ -51,12 +51,18 @@ void SoundPack::uninit()
 {
     std::lock_guard<std::mutex> lock(mtx_);
 
-    if (!initialized_.load(std::memory_order_acquire)) { return; }
+    if (!initialized_.load(std::memory_order_acquire)) {
+        return;
+    }
 
-    if (!sound_) { return; }
+    if (!sound_) {
+        return;
+    }
 
     ma_result result = ma_sound_stop(sound_.get());
-    if (result != MA_SUCCESS) { LOG("failed to stop sound", LogType::ERROR); }
+    if (result != MA_SUCCESS) {
+        LOG("failed to stop sound", LogType::ERROR);
+    }
 
     ma_sound_uninit(sound_.get());
 
@@ -251,7 +257,9 @@ void soundAtEndCallback(void* user_data, ma_sound* sound)
     }
     const std::string& music_playing = *(data->music_playing_);
 
-    if (!(data->config_->isRepetitive())) { data->music_list_->remove(music_playing); }
+    if (!(data->config_->isRepetitive())) {
+        data->music_list_->remove(music_playing);
+    }
     data->music_list_->tailIn(music_playing);
 
     const std::string MUSIC_TO_PLAY = data->music_list_->headOut()->getMusic();
@@ -268,11 +276,6 @@ void soundAtEndCallback(void* user_data, ma_sound* sound)
     );
     if (result != MA_SUCCESS) {
         LOG(fmt::format("failed to play music: {}", MUSIC_TO_PLAY), LogType::ERROR);
-        fmt::print("failed in soundAtEndCallback\n");
-        // data->sound_to_play_->uninit();
-        // data->sound_to_register_->uninit();
-        fmt::print("{}\n", data->sound_to_play_->isInitialized());
-        fmt::print("{}\n", data->sound_to_register_->isInitialized());
         data->controller_->signalError();
     }
     else {

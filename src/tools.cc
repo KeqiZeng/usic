@@ -65,7 +65,9 @@ void addMusicToList(std::string_view list_name, Config* config)
     while (std::getline(infile, music)) {
         // only add music that is not in playlist
         if (std::filesystem::exists(play_list_path)) {
-            if (!utils::isLineInFile(music, play_list_path.string())) { outfile << music << '\n'; }
+            if (!utils::isLineInFile(music, play_list_path.string())) {
+                outfile << music << '\n';
+            }
         }
     }
     outfile.close();
@@ -91,7 +93,9 @@ static std::optional<std::string> getMusicNameFZF(std::string_view music_list_na
     std::getline(infile, music);
     infile.close();
 
-    if (music.empty()) { return std::nullopt; }
+    if (music.empty()) {
+        return std::nullopt;
+    }
     return fmt::format("\"{}\"", music);
 }
 
@@ -125,7 +129,9 @@ void fuzzyPlay(std::string_view usic_command, Config* config)
     const std::string COMMAND = fmt::format("{} {} {}", usic_command, PLAY, music_name.value());
 
     ret_code = std::system(COMMAND.c_str());
-    if (ret_code != 0) { fmt::print(stderr, "{}: command failed with exit code {}\n", COMMAND, ret_code); }
+    if (ret_code != 0) {
+        fmt::print(stderr, "{}: command failed with exit code {}\n", COMMAND, ret_code);
+    }
 }
 
 } // namespace tools

@@ -78,12 +78,16 @@ ma_result play(
             controller,
             config
         );
-        if (result != MA_SUCCESS) { LOG(fmt::format("failed to play music: {}", music_to_play), LogType::ERROR); }
+        if (result != MA_SUCCESS) {
+            LOG(fmt::format("failed to play music: {}", music_to_play), LogType::ERROR);
+        }
     }
     else {
         playLater(config, music_to_play, music_list);
         result = playNext(ma_comp);
-        if (result != MA_SUCCESS) { LOG(fmt::format("failed to play music: {}", music_to_play), LogType::ERROR); }
+        if (result != MA_SUCCESS) {
+            LOG(fmt::format("failed to play music: {}", music_to_play), LogType::ERROR);
+        }
     }
     return result;
 }
@@ -94,7 +98,9 @@ void playLater(Config* config, std::string_view music, MusicList* music_list)
         LOG("got an invalid music_list", LogType::ERROR);
         return;
     }
-    if (!config->isRepetitive()) { music_list->remove(music); }
+    if (!config->isRepetitive()) {
+        music_list->remove(music);
+    }
     music_list->headIn(music);
 }
 
@@ -241,7 +247,9 @@ ma_result setCursor(MaComponents* ma_comp, std::string_view time)
     // Get the total length of the sound
     float length     = 0;
     ma_result result = ma_sound_get_length_in_seconds(sound, &length);
-    if (result != MA_SUCCESS) { return result; }
+    if (result != MA_SUCCESS) {
+        return result;
+    }
 
     int len_int = static_cast<int>(length); // must be rounded down
 
@@ -272,7 +280,9 @@ ma_result getProgress(MaComponents* ma_comp, const std::string& music_playing, P
 
     // Get the current cursor position
     ma_result result = ma_sound_get_cursor_in_seconds(sound, &cursor);
-    if (result != MA_SUCCESS) { return result; }
+    if (result != MA_SUCCESS) {
+        return result;
+    }
 
     // Get the duration of the sound
     result = ma_sound_get_length_in_seconds(sound, &duration);
@@ -434,7 +444,9 @@ std::vector<std::string> getList(MusicList* music_list)
     std::vector<std::string> list;
     for (auto& music : raw_list) {
         std::optional<std::string> music_name = utils::removeExt(music);
-        if (music_name.has_value()) { list.push_back(music_name.value()); }
+        if (music_name.has_value()) {
+            list.push_back(music_name.value());
+        }
     }
     return list;
 }

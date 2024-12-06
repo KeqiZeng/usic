@@ -55,7 +55,8 @@ void NamedPipe::openPipe(OpenMode open_mode)
 
 void NamedPipe::closePipe()
 {
-    if (this->fd_ != -1) close(this->fd_);
+    if (this->fd_ != -1)
+        close(this->fd_);
 }
 
 void NamedPipe::deletePipe()
@@ -77,7 +78,9 @@ void NamedPipe::writeIn(std::string_view msg)
     }
 
     ssize_t bytes_written = write(this->fd_, msg.data(), msg.size());
-    if (bytes_written == -1) { LOG(fmt::format("failed to write to named pipe {}", this->PIPE_PATH_), LogType::ERROR); }
+    if (bytes_written == -1) {
+        LOG(fmt::format("failed to write to named pipe {}", this->PIPE_PATH_), LogType::ERROR);
+    }
 }
 
 std::string NamedPipe::readOut()
@@ -107,7 +110,9 @@ Config::Config(bool repetitive, bool random, std::string_view usic_library, std:
         LOG("usicLibrary can not be empty", LogType::ERROR);
         throw std::runtime_error("usicLibrary can not be empty");
     }
-    if (usic_library.back() != '/') { this->usic_library_ = fmt::format("{}{}", usic_library, '/'); }
+    if (usic_library.back() != '/') {
+        this->usic_library_ = fmt::format("{}{}", usic_library, '/');
+    }
     else {
         this->usic_library_ = usic_library;
     }
@@ -181,11 +186,17 @@ void setupRuntime(NamedPipe* pipe_to_server, NamedPipe* pipe_to_client)
         throw std::runtime_error("failed to get environment variable: HOME");
     }
     // create runtime path
-    if (!std::filesystem::exists(RUNTIME_PATH)) { std::filesystem::create_directory(RUNTIME_PATH); }
+    if (!std::filesystem::exists(RUNTIME_PATH)) {
+        std::filesystem::create_directory(RUNTIME_PATH);
+    }
 
     // remove log files for initialization
-    if (std::filesystem::exists(ERROR_LOG_FILE)) { std::filesystem::remove(ERROR_LOG_FILE); }
-    if (std::filesystem::exists(INFO_LOG_FILE)) { std::filesystem::remove(INFO_LOG_FILE); }
+    if (std::filesystem::exists(ERROR_LOG_FILE)) {
+        std::filesystem::remove(ERROR_LOG_FILE);
+    }
+    if (std::filesystem::exists(INFO_LOG_FILE)) {
+        std::filesystem::remove(INFO_LOG_FILE);
+    }
 
     // setup named pipes
     if (pipe_to_server == nullptr || pipe_to_client == nullptr) {

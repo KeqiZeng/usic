@@ -17,7 +17,7 @@ MusicNode::MusicNode(std::string_view music)
 
 [[nodiscard]] const std::string MusicNode::getMusic() const
 {
-    return this->music_;
+    return music_;
 }
 
 // three situations:
@@ -42,7 +42,7 @@ MusicList::MusicList(std::string_view list_file_path)
 }
 MusicList::~MusicList()
 {
-    auto current = this->head_;
+    auto current = head_;
     while (current) {
         auto temp = current;
         current   = current->next_;
@@ -71,16 +71,16 @@ void MusicList::load(std::string_view list_path)
 
 [[nodiscard]] bool MusicList::isEmpty() const
 {
-    return this->count_ == 0;
+    return count_ == 0;
 }
 [[nodiscard]] int MusicList::getCount() const
 {
-    return this->count_;
+    return count_;
 }
 [[nodiscard]] std::vector<std::string> MusicList::getList()
 {
     std::vector<std::string> list;
-    MusicNode* current = this->head_.get();
+    MusicNode* current = head_.get();
     while (current != nullptr) {
         list.push_back(current->music_);
         current = current->next_.get();
@@ -91,70 +91,80 @@ void MusicList::load(std::string_view list_path)
 void MusicList::tailIn(std::string_view music)
 {
     auto new_node = std::make_shared<MusicNode>(music);
-    if (!this->head_) {
-        this->head_ = std::move(new_node);
-        this->tail_ = this->head_;
+    if (!head_) {
+        head_ = std::move(new_node);
+        tail_ = head_;
     }
     else {
-        new_node->prev_    = this->tail_;
-        this->tail_->next_ = std::move(new_node);
-        this->tail_        = this->tail_->next_;
+        new_node->prev_ = tail_;
+        tail_->next_    = std::move(new_node);
+        tail_           = tail_->next_;
     }
-    this->count_ += 1;
+    count_ += 1;
 }
 
 std::shared_ptr<MusicNode> MusicList::headOut()
 {
-    if (!this->head_) { return nullptr; }
-    auto result = this->head_;
-    this->head_ = this->head_->next_;
-    if (!this->head_) { this->tail_ = nullptr; }
-    else {
-        result->next_      = nullptr;
-        this->head_->prev_ = nullptr;
+    if (!head_) {
+        return nullptr;
     }
-    this->count_ -= 1;
+    auto result = head_;
+    head_       = head_->next_;
+    if (!head_) {
+        tail_ = nullptr;
+    }
+    else {
+        result->next_ = nullptr;
+        head_->prev_  = nullptr;
+    }
+    count_ -= 1;
     return result;
 }
 
 std::shared_ptr<MusicNode> MusicList::tailOut()
 {
-    if (!this->head_) { return nullptr; }
-    auto result = this->tail_;
-    this->tail_ = this->tail_->prev_;
-    if (!this->tail_) { this->head_ = nullptr; }
-    else {
-        result->prev_      = nullptr;
-        this->tail_->next_ = nullptr;
+    if (!head_) {
+        return nullptr;
     }
-    this->count_ -= 1;
+    auto result = tail_;
+    tail_       = tail_->prev_;
+    if (!tail_) {
+        head_ = nullptr;
+    }
+    else {
+        result->prev_ = nullptr;
+        tail_->next_  = nullptr;
+    }
+    count_ -= 1;
     return result;
 }
 
 void MusicList::headIn(std::string_view music)
 {
     auto new_node = std::make_shared<MusicNode>(music);
-    if (!this->head_) {
-        this->head_ = std::move(new_node);
-        this->tail_ = head_;
+    if (!head_) {
+        head_ = std::move(new_node);
+        tail_ = head_;
     }
     else {
-        new_node->next_    = this->head_;
-        this->head_->prev_ = new_node;
-        this->head_        = std::move(new_node);
+        new_node->next_ = head_;
+        head_->prev_    = new_node;
+        head_           = std::move(new_node);
     }
-    this->count_ += 1;
+    count_ += 1;
 }
 
 std::shared_ptr<MusicNode> MusicList::randomOut()
 {
-    if (this->count_ == 0) { return nullptr; }
+    if (count_ == 0) {
+        return nullptr;
+    }
     std::random_device rd;
     std::mt19937 gen(rd());
     std::shared_ptr<MusicNode> result(nullptr);
-    if (this->count_ < 100) {
-        std::uniform_int_distribution<int> dist(0, this->count_ - 1);
-        result = this->head_;
+    if (count_ < 100) {
+        std::uniform_int_distribution<int> dist(0, count_ - 1);
+        result = head_;
         for (int i = 0; i < dist(gen); i++) {
             result = result->next_;
         }
@@ -163,27 +173,31 @@ std::shared_ptr<MusicNode> MusicList::randomOut()
         std::uniform_int_distribution<int> dist(1, 100);
         int index = dist(gen);
         if (index < 50) {
-            result = this->head_;
+            result = head_;
             for (int i = 0; i < index + 10; i++) {
                 result = result->next_;
             }
         }
         else {
-            result = this->tail_;
+            result = tail_;
             for (int i = 0; i < index + 10; i++) {
                 result = result->prev_;
             }
         }
     }
 
-    if (result == this->head_) {
-        this->head_ = this->head_->next_;
-        if (this->head_) { this->head_->prev_ = nullptr; }
+    if (result == head_) {
+        head_ = head_->next_;
+        if (head_) {
+            head_->prev_ = nullptr;
+        }
         result->next_ = nullptr;
     }
-    else if (result == this->tail_) {
-        this->tail_ = this->tail_->prev_;
-        if (this->tail_) { this->tail_->next_ = nullptr; }
+    else if (result == tail_) {
+        tail_ = tail_->prev_;
+        if (tail_) {
+            tail_->next_ = nullptr;
+        }
         result->prev_ = nullptr;
     }
     else {
@@ -192,15 +206,17 @@ std::shared_ptr<MusicNode> MusicList::randomOut()
         result->prev_        = nullptr;
         result->next_        = nullptr;
     }
-    this->count_ -= 1;
+    count_ -= 1;
     return result;
 }
 
 bool MusicList::contain(std::string_view music)
 {
-    auto current = this->head_;
+    auto current = head_;
     while (current) {
-        if (current->getMusic() == music) { return true; }
+        if (current->getMusic() == music) {
+            return true;
+        }
         current = current->next_;
     }
     return false;
@@ -208,17 +224,21 @@ bool MusicList::contain(std::string_view music)
 
 bool MusicList::remove(std::string_view music)
 {
-    auto current = this->head_;
+    auto current = head_;
     while (current) {
         if (current->getMusic() == music) {
-            if (current == this->head_) {
-                this->head_ = this->head_->next_;
-                if (this->head_) { this->head_->prev_ = nullptr; }
+            if (current == head_) {
+                head_ = head_->next_;
+                if (head_) {
+                    head_->prev_ = nullptr;
+                }
                 current->next_ = nullptr;
             }
-            else if (current == this->tail_) {
-                this->tail_ = this->tail_->prev_;
-                if (this->tail_) { this->tail_->next_ = nullptr; }
+            else if (current == tail_) {
+                tail_ = tail_->prev_;
+                if (tail_) {
+                    tail_->next_ = nullptr;
+                }
                 current->prev_ = nullptr;
             }
             else {
@@ -228,7 +248,7 @@ bool MusicList::remove(std::string_view music)
                 current->next_        = nullptr;
             }
             current.reset();
-            this->count_ -= 1;
+            count_ -= 1;
             return true;
         }
         current = current->next_;
@@ -238,7 +258,7 @@ bool MusicList::remove(std::string_view music)
 
 void MusicList::clear()
 {
-    auto current = this->head_;
+    auto current = head_;
     while (current) {
         auto temp = current;
         current   = current->next_;
@@ -246,7 +266,7 @@ void MusicList::clear()
         temp->next_.reset();
         temp.reset();
     }
-    this->head_  = nullptr;
-    this->tail_  = nullptr;
-    this->count_ = 0;
+    head_  = nullptr;
+    tail_  = nullptr;
+    count_ = 0;
 }
