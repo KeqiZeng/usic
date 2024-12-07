@@ -11,6 +11,52 @@
 #include <string_view>
 #include <thread>
 
+EnginePack::EnginePack()
+    : engine_(new ma_engine)
+{
+    ma_result result = ma_engine_init(nullptr, engine_);
+    if (result != MA_SUCCESS) {
+        LOG("failed to initialize engine", LogType::ERROR);
+        throw std::runtime_error("failed to initialize engine");
+    }
+    ma_device* device = ma_engine_get_device(engine_);
+    result            = ma_device_get_master_volume(device, &volume_);
+    if (result != MA_SUCCESS) {
+        LOG("failed to get master volume", LogType::ERROR);
+    }
+    LOG("initialized engine", LogType::INFO);
+}
+
+EnginePack::~EnginePack()
+{
+    ma_engine_uninit(engine_);
+    delete engine_;
+    LOG("uninitialized engine", LogType::INFO);
+}
+
+float EnginePack::getVolume()
+{
+    return volume_;
+}
+
+ma_result EnginePack::setVolume(float volume)
+{
+    last_volume_      = volume_;
+    ma_device* device = ma_engine_get_device(engine_);
+    ma_result result  = ma_device_set_master_volume(device, volume);
+    if (result != MA_SUCCESS) {
+        LOG("failed to set master volume", LogType::ERROR);
+        return result;
+    }
+    volume_ = volume;
+    return MA_SUCCESS;
+}
+
+float EnginePack::getLastVolume()
+{
+    return last_volume_;
+}
+
 SoundPack::SoundPack()
     : sound_init_notification_(std::make_unique<SoundInitNotification>())
 {
@@ -19,7 +65,7 @@ SoundPack::SoundPack()
 }
 SoundPack::~SoundPack()
 {
-    uninit();
+    this->uninit();
 }
 
 ma_result SoundPack::init(ma_engine* engine, std::string_view file_path, ma_uint32 flags)
@@ -83,7 +129,7 @@ bool SoundPack::isPlaying()
 }
 
 MaComponents::MaComponents()
-    : engine_(std::make_unique<ma_engine>())
+    : engine_pack_(std::make_unique<EnginePack>())
     , sound_to_play_(std::make_unique<SoundPack>())
     , sound_to_register_(std::make_unique<SoundPack>())
 {
@@ -91,20 +137,13 @@ MaComponents::MaComponents()
 
 MaComponents::~MaComponents()
 {
-    ma_engine_uninit(engine_.get());
-}
-
-void MaComponents::maCompInitEngine()
-{
-    ma_result result = ma_engine_init(nullptr, engine_.get());
-    if (result != MA_SUCCESS) {
-        LOG("failed to initialize engine", LogType::ERROR);
-        throw std::runtime_error("failed to initialize engine");
-    }
+    engine_pack_.reset();
+    sound_to_play_.reset();
+    sound_to_register_.reset();
 }
 
 UserData::UserData(
-    ma_engine* engine,
+    EnginePack* engine_pack,
     SoundPack* sound_to_play,
     SoundPack* sound_to_register,
     Controller* controller,
@@ -112,7 +151,7 @@ UserData::UserData(
     std::string* music_playing,
     Config* config
 )
-    : engine_(engine)
+    : engine_pack_(engine_pack)
     , sound_to_play_(sound_to_play)
     , sound_to_register_(sound_to_register)
     , controller_(controller)
@@ -166,7 +205,7 @@ void Controller::waitForCleanerExit()
 }
 
 ma_result playInternal(
-    ma_engine* engine,
+    EnginePack* engine_pack,
     SoundPack* sound_to_play,
     std::string_view music_to_play,
     std::string* music_playing,
@@ -180,8 +219,11 @@ ma_result playInternal(
 
     sound_to_register->playing_.store(false, std::memory_order_release);
 
-    ma_result result =
-        sound_to_play->init(engine, fmt::format("{}{}", config->getUsicLibrary(), music_to_play), LOADING_FLAGS);
+    ma_result result = sound_to_play->init(
+        engine_pack->engine_,
+        fmt::format("{}{}", config->getUsicLibrary(), music_to_play),
+        LOADING_FLAGS
+    );
     if (result != MA_SUCCESS) {
         LOG(fmt::format("failed to initialize sound from file: {}", music_to_play), LogType::ERROR);
         return result;
@@ -197,7 +239,7 @@ ma_result playInternal(
     }
 
     auto* user_data(
-        new UserData(engine, sound_to_register, sound_to_play, controller, music_list, music_playing, config)
+        new UserData(engine_pack, sound_to_register, sound_to_play, controller, music_list, music_playing, config)
     );
 
     ma_sound_set_end_callback(sound_to_play->sound_.get(), soundAtEndCallback, user_data);
@@ -265,7 +307,7 @@ void soundAtEndCallback(void* user_data, ma_sound* sound)
     const std::string MUSIC_TO_PLAY = data->music_list_->headOut()->getMusic();
 
     ma_result result = playInternal(
-        data->engine_,
+        data->engine_pack_,
         data->sound_to_play_,
         MUSIC_TO_PLAY,
         data->music_playing_,

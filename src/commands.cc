@@ -69,7 +69,7 @@ ma_result play(
     }
     if (!ma_comp->sound_to_play_->isPlaying() && !ma_comp->sound_to_register_->isPlaying()) {
         result = playInternal(
-            ma_comp->engine_.get(),
+            ma_comp->engine_pack_.get(),
             ma_comp->sound_to_play_.get(),
             music_to_play,
             music_playing,
@@ -327,46 +327,17 @@ ma_result getProgress(MaComponents* ma_comp, const std::string& music_playing, P
     return result;
 }
 
-/*
- * Adjust the volume of the engine, which should be 0.0-1.0.
- * The parameter "diff" indicates the step length.
- */
-static ma_result adjustVolume(ma_engine* engine, float diff)
+ma_result volumeUp(EnginePack* engine)
 {
-    ma_device* device = ma_engine_get_device(engine);
-
-    // Get current volume of the engine
-    float current_volume = 0.0;
-    ma_result result     = ma_device_get_master_volume(device, &current_volume);
-    if (result != MA_SUCCESS) {
-        LOG("failed to get master volume", LogType::ERROR);
-        return result;
-    }
-
-    // Calculate the new volume
-    float new_volume = current_volume + diff;
-    new_volume       = new_volume < 0.0F ? 0.0F : new_volume > 1.0F ? 1.0F : new_volume;
-
-    // Set volume
-    result = ma_device_set_master_volume(device, new_volume);
-    if (result != MA_SUCCESS) {
-        LOG("failed to set master volume", LogType::ERROR);
-        return result;
-    }
-    return MA_SUCCESS;
+    return engine->setVolume(engine->getVolume() + VOLUME_STEP);
 }
 
-ma_result volumeUp(ma_engine* engine)
+ma_result volumeDown(EnginePack* engine)
 {
-    return adjustVolume(engine, VOLUME_STEP);
+    return engine->setVolume(engine->getVolume() - VOLUME_STEP);
 }
 
-ma_result volumeDown(ma_engine* engine)
-{
-    return adjustVolume(engine, -VOLUME_STEP);
-}
-
-ma_result setVolume(ma_engine* engine, std::string_view volume_str)
+ma_result setVolume(EnginePack* engine, std::string_view volume_str)
 {
     // Convert the volume string to float
     float volume;
@@ -383,50 +354,23 @@ ma_result setVolume(ma_engine* engine, std::string_view volume_str)
     }
     volume = volume < 0.0F ? 0.0F : volume > 1.0F ? 1.0F : volume;
 
-    // Set volume
-    ma_device* device = ma_engine_get_device(engine);
-    ma_result result  = ma_device_set_master_volume(device, volume);
-    if (result != MA_SUCCESS) {
-        LOG("failed to set master volume", LogType::ERROR);
-        return result;
-    }
-    return MA_SUCCESS;
+    return engine->setVolume(volume);
 }
 
 /*
  * Get the volume of the engine and print it as 0-100%
  */
-ma_result getVolume(ma_engine* engine, float* volume)
+float getVolume(EnginePack* engine)
 {
-    ma_device* device = ma_engine_get_device(engine);
-    return ma_device_get_master_volume(device, volume);
+    return engine->getVolume();
 }
 
-ma_result mute(ma_engine* engine)
+ma_result mute(EnginePack* engine)
 {
-    ma_device* device = ma_engine_get_device(engine);
-
-    float current_volume = 0.0;
-    ma_result result     = ma_device_get_master_volume(device, &current_volume);
-    if (result != MA_SUCCESS) {
-        LOG("failed to get master volume", LogType::ERROR);
-        return result;
+    if (engine->getVolume() == 0.0F) {
+        return engine->setVolume(engine->getLastVolume());
     }
-    if (current_volume == 0.0F) {
-        result = ma_device_set_master_volume(device, 1.0F);
-        if (result != MA_SUCCESS) {
-            LOG("failed to set master volume", LogType::ERROR);
-            return result;
-        }
-    }
-    else {
-        result = ma_device_set_master_volume(device, 0.0F);
-        if (result != MA_SUCCESS) {
-            LOG("failed to set master volume", LogType::ERROR);
-            return result;
-        }
-    }
-    return MA_SUCCESS;
+    return engine->setVolume(0.0F);
 }
 
 void setRandom(Config* config)

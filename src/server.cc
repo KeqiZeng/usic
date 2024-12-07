@@ -250,7 +250,7 @@ void handleCommand(
         }
     }
     else if (utils::commandEq(sub_cmd, VOLUME_UP)) {
-        ma_result result = commands::volumeUp(ma_comp->engine_.get());
+        ma_result result = commands::volumeUp(ma_comp->engine_pack_.get());
         if (result != MA_SUCCESS) {
             logErrorAndSendToClient("Failed to turn the volume up", pipe_to_server, pipe_to_client);
         }
@@ -259,7 +259,7 @@ void handleCommand(
         }
     }
     else if (utils::commandEq(sub_cmd, VOLUME_DOWN)) {
-        ma_result result = commands::volumeDown(ma_comp->engine_.get());
+        ma_result result = commands::volumeDown(ma_comp->engine_pack_.get());
         if (result != MA_SUCCESS) {
             logErrorAndSendToClient("Failed to turn the volume down", pipe_to_server, pipe_to_client);
         }
@@ -270,7 +270,7 @@ void handleCommand(
     else if (utils::commandEq(sub_cmd, SET_VOLUME)) {
         if (args.size() >= 2) {
             const std::string& volume = args.at(1);
-            ma_result result          = commands::setVolume(ma_comp->engine_.get(), volume);
+            ma_result result          = commands::setVolume(ma_comp->engine_pack_.get(), volume);
             if (result != MA_SUCCESS) {
                 logErrorAndSendToClient("Failed to set volume", pipe_to_server, pipe_to_client);
             }
@@ -287,17 +287,17 @@ void handleCommand(
         }
     }
     else if (utils::commandEq(sub_cmd, GET_VOLUME)) {
-        float volume     = -1;
-        ma_result result = commands::getVolume(ma_comp->engine_.get(), &volume);
-        if (result != MA_SUCCESS) {
-            logErrorAndSendToClient("Failed to get volume", pipe_to_server, pipe_to_client);
-        }
-        else {
-            sendMsgToClient(fmt::format("Volume: {}", volume), pipe_to_server, pipe_to_client);
-        }
+        float volume = commands::getVolume(ma_comp->engine_pack_.get());
+        sendMsgToClient(fmt::format("Volume: {}", volume), pipe_to_server, pipe_to_client);
+        // if (result != MA_SUCCESS) {
+        //     logErrorAndSendToClient("Failed to get volume", pipe_to_server, pipe_to_client);
+        // }
+        // else {
+        //     sendMsgToClient(fmt::format("Volume: {}", volume), pipe_to_server, pipe_to_client);
+        // }
     }
     else if (utils::commandEq(sub_cmd, MUTE)) {
-        ma_result result = commands::mute(ma_comp->engine_.get());
+        ma_result result = commands::mute(ma_comp->engine_pack_.get());
         if (result != MA_SUCCESS) {
             logErrorAndSendToClient("Failed to (un)mute", pipe_to_server, pipe_to_client);
         }
@@ -342,8 +342,7 @@ void server()
     setupRuntime(pipe_to_server.get(), pipe_to_client.get()); // throw fatal error
 
     auto config  = std::make_unique<Config>(REPETITIVE, RANDOM, USIC_LIBRARY, PLAY_LISTS_PATH); // throw fatal error
-    auto ma_comp = std::make_unique<MaComponents>();
-    ma_comp->maCompInitEngine(); // throw fatal error
+    auto ma_comp = std::make_unique<MaComponents>();                                            // throw fatal error
 
     auto music_list = std::make_unique<MusicList>();
     initMusicList(music_list.get(), config.get()); // throw fatal error

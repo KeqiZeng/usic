@@ -20,6 +20,21 @@ struct SoundInitNotification
     void* data_;
 };
 
+class EnginePack
+{
+  public:
+    ma_engine* engine_{nullptr};
+    EnginePack();
+    ~EnginePack();
+    float getVolume();
+    ma_result setVolume(float volume);
+    float getLastVolume();
+
+  private:
+    float volume_{1.0F};
+    float last_volume_{1.0F};
+};
+
 class SoundPack
 {
   public:
@@ -40,7 +55,7 @@ class SoundPack
 
     friend void soundInitNotificationCallback(ma_async_notification* notification);
     friend ma_result playInternal(
-        ma_engine* engine,
+        EnginePack* engine_pack,
         SoundPack* sound_to_play,
         std::string_view music_to_play,
         std::string* music_playing,
@@ -53,19 +68,17 @@ class SoundPack
 
 struct MaComponents
 {
-    std::unique_ptr<ma_engine> engine_;
+    std::unique_ptr<EnginePack> engine_pack_;
     std::unique_ptr<SoundPack> sound_to_play_;
     std::unique_ptr<SoundPack> sound_to_register_;
 
     MaComponents();
     ~MaComponents();
-
-    void maCompInitEngine();
 };
 
 struct UserData
 {
-    ma_engine* engine_;
+    EnginePack* engine_pack_;
     SoundPack* sound_to_play_;
     SoundPack* sound_to_register_;
     Controller* controller_;
@@ -74,7 +87,7 @@ struct UserData
     Config* config_;
 
     UserData(
-        ma_engine* engine,
+        EnginePack* engine_pack,
         SoundPack* sound_to_play,
         SoundPack* sound_to_register,
         Controller* controller,
@@ -106,7 +119,7 @@ class Controller
 };
 
 ma_result playInternal(
-    ma_engine* engine,
+    EnginePack* engine_pack,
     SoundPack* sound_to_play,
     std::string_view music_to_play,
     std::string* music_playing,
