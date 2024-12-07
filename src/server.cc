@@ -209,8 +209,8 @@ void handleCommand(
             sendMsgToClient(NO_MESSAGE, pipe_to_server, pipe_to_client);
         }
     }
-    else if (utils::commandEq(sub_cmd, CURSOR_FORWARD)) {
-        ma_result result = commands::cursorForward(ma_comp);
+    else if (utils::commandEq(sub_cmd, SEEK_FORWARD)) {
+        ma_result result = commands::seekForward(ma_comp);
         if (result != MA_SUCCESS) {
             logErrorAndSendToClient("Failed to move cursor forward", pipe_to_server, pipe_to_client);
         }
@@ -218,8 +218,8 @@ void handleCommand(
             sendMsgToClient(NO_MESSAGE, pipe_to_server, pipe_to_client);
         }
     }
-    else if (utils::commandEq(sub_cmd, CURSOR_BACKWARD)) {
-        ma_result result = commands::cursorBackward(ma_comp);
+    else if (utils::commandEq(sub_cmd, SEEK_BACKWARD)) {
+        ma_result result = commands::seekBackward(ma_comp);
         if (result != MA_SUCCESS) {
             logErrorAndSendToClient("Failed to move cursor backward", pipe_to_server, pipe_to_client);
         }
@@ -227,10 +227,10 @@ void handleCommand(
             sendMsgToClient(NO_MESSAGE, pipe_to_server, pipe_to_client);
         }
     }
-    else if (utils::commandEq(sub_cmd, SET_CURSOR)) {
+    else if (utils::commandEq(sub_cmd, SEEK_TO)) {
         if (args.size() >= 2) {
             const std::string& time = args.at(1);
-            ma_result result        = commands::setCursor(ma_comp, time);
+            ma_result result        = commands::seekTo(ma_comp, time);
             if (result != MA_SUCCESS) {
                 logErrorAndSendToClient("Failed to set cursor", pipe_to_server, pipe_to_client);
             }

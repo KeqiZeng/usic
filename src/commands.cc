@@ -176,7 +176,7 @@ ma_result pause(MaComponents* ma_comp)
     return MA_SUCCESS;
 }
 
-static ma_result moveCursor(MaComponents* ma_comp, int seconds)
+static ma_result seekDiff(MaComponents* ma_comp, int seconds)
 {
     ma_sound* sound = getPlayingSound(ma_comp);
     if (sound == nullptr) {
@@ -198,21 +198,20 @@ static ma_result moveCursor(MaComponents* ma_comp, int seconds)
         return result;
     }
 
-    // Calculate the position of the cursor after moving
-    ma_uint64 moved_cursor = 0;
+    // Calculate the position of the cursor after seeking
+    ma_uint64 cursor_position = 0;
     if (seconds > 0) {
-        int new_cursor = cursor + (ma_engine_get_sample_rate(ma_comp->engine_.get()) * seconds);
-        moved_cursor   = new_cursor < length ? new_cursor : length;
+        int new_cursor  = cursor + (ma_engine_get_sample_rate(ma_comp->engine_pack_->engine_) * seconds);
+        cursor_position = new_cursor < length ? new_cursor : length;
     }
     else {
         seconds        = -seconds;
-        int new_cursor = cursor - (ma_engine_get_sample_rate(ma_comp->engine_.get()) * seconds);
+        int new_cursor = cursor - (ma_engine_get_sample_rate(ma_comp->engine_pack_->engine_) * seconds);
 
-        moved_cursor = new_cursor > 0 ? new_cursor : 0;
+        cursor_position = new_cursor > 0 ? new_cursor : 0;
     }
 
-    // Move cursor
-    result = ma_sound_seek_to_pcm_frame(sound, moved_cursor);
+    result = ma_sound_seek_to_pcm_frame(sound, cursor_position);
     if (result != MA_SUCCESS) {
         LOG("failed to seek to pcm frame", LogType::ERROR);
         return result;
@@ -220,16 +219,16 @@ static ma_result moveCursor(MaComponents* ma_comp, int seconds)
     return result;
 }
 
-ma_result cursorForward(MaComponents* ma_comp)
+ma_result seekForward(MaComponents* ma_comp)
 {
-    return moveCursor(ma_comp, STEP_SECONDS);
+    return seekDiff(ma_comp, STEP_SECONDS);
 }
-ma_result cursorBackward(MaComponents* ma_comp)
+ma_result seekBackward(MaComponents* ma_comp)
 {
-    return moveCursor(ma_comp, -STEP_SECONDS);
+    return seekDiff(ma_comp, -STEP_SECONDS);
 }
 
-ma_result setCursor(MaComponents* ma_comp, std::string_view time)
+ma_result seekTo(MaComponents* ma_comp, std::string_view time)
 {
     ma_sound* sound = getPlayingSound(ma_comp);
     if (sound == nullptr) {
@@ -258,7 +257,8 @@ ma_result setCursor(MaComponents* ma_comp, std::string_view time)
                       : optional_destination.value() > len_int ? len_int
                                                                : optional_destination.value();
 
-    result = ma_sound_seek_to_pcm_frame(sound, (ma_engine_get_sample_rate(ma_comp->engine_.get()) * destination));
+    result =
+        ma_sound_seek_to_pcm_frame(sound, (ma_engine_get_sample_rate(ma_comp->engine_pack_->engine_) * destination));
 
     if (result != MA_SUCCESS) {
         LOG("failed to seek to pcm frame", LogType::ERROR);

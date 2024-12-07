@@ -31,9 +31,9 @@ const std::string PLAY_LATER        = "play_later";
 const std::string PLAY_NEXT         = "play_next";
 const std::string PLAY_PREV         = "play_prev";
 const std::string PAUSE             = "pause";
-const std::string CURSOR_FORWARD    = "cursor_forward";
-const std::string CURSOR_BACKWARD   = "cursor_backward";
-const std::string SET_CURSOR        = "set_cursor";
+const std::string SEEK_FORWARD      = "seek_forward";
+const std::string SEEK_BACKWARD     = "seek_backward";
+const std::string SEEK_TO           = "seek_to";
 const std::string GET_PROGRESS      = "get_progress";
 const std::string VOLUME_UP         = "volume_up";
 const std::string VOLUME_DOWN       = "volume_down";
@@ -56,9 +56,9 @@ const std::unordered_map<std::string, std::vector<std::string>> COMMANDS = {
     {PLAY_NEXT, {"pn", "next"}},
     {PLAY_PREV, {"pp", "prev"}},
     {PAUSE, {"ps"}},
-    {CURSOR_FORWARD, {"cf", "forward"}},
-    {CURSOR_BACKWARD, {"cb", "backward"}},
-    {SET_CURSOR, {"sc", "cursor"}},
+    {SEEK_FORWARD, {"sf", "forward"}},
+    {SEEK_BACKWARD, {"sb", "backward"}},
+    {SEEK_TO, {"seek", "st"}},
     {GET_PROGRESS, {"gp", "progress"}},
     {VOLUME_UP, {"vu"}},
     {VOLUME_DOWN, {"vd"}},
