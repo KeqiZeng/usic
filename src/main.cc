@@ -1,18 +1,14 @@
 #include <cstdio>
 #include <cstring>
 #include <exception>
-#include <string>
 #include <sys/_types/_pid_t.h>
 #include <unistd.h>
 
-#include "app.h"
 #include "client.h"
-#include "config.h"
 #include "fmt/core.h"
 #include "runtime.h"
 #include "server.h"
 #include "tools.h"
-#include "utils.h"
 
 /* marcos */
 #define MA_ENABLE_ONLY_SPECIFIC_BACKENDS
@@ -24,46 +20,6 @@
 
 // miniaudio should be included after MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
-
-bool flagOrTool(int argc, char* argv[])
-{
-    if (argc > 1) {
-        std::vector<std::string> args;
-        for (int i = 1; i < argc; i++) {
-            args.push_back(argv[i]);
-        }
-
-        if (utils::commandEq(args[0], PRINT_VERSION)) {
-            fmt::print("{}\n", VERSION);
-        }
-        else if (utils::commandEq(args[0], PRINT_HELP)) {
-            fmt::print("{}\n", DOC);
-        }
-        else if (utils::commandEq(args[0], ADD_MUSIC_TO_LIST)) {
-            if (args.size() < 2) {
-                fmt::print(stderr, "not enough arguments\n");
-            }
-            auto config = std::make_unique<Config>(
-                USIC_LIBRARY,
-                PLAY_LISTS_PATH,
-                DEFAULT_PLAY_MODE
-            ); // throw fatal error
-            tools::addMusicToList(args[1], config.get());
-        }
-        else if (utils::commandEq(args[0], FUZZY_PLAY)) {
-            auto config = std::make_unique<Config>(
-                USIC_LIBRARY,
-                PLAY_LISTS_PATH,
-                DEFAULT_PLAY_MODE
-            ); // throw fatal error
-            tools::fuzzyPlay(argv[0], config.get());
-        }
-        else {
-            return false;
-        }
-    }
-    return true;
-}
 
 int main(int argc, char* argv[])
 {

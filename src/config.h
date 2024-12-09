@@ -53,6 +53,7 @@ const std::string PRINT_VERSION     = "--version";
 const std::string PRINT_HELP        = "--help";
 const std::string ADD_MUSIC_TO_LIST = "add_music_to_list";
 const std::string FUZZY_PLAY        = "fuzzy_play";
+const std::string FUZZY_PLAY_LATER  = "fuzzy_play_later";
 
 const std::unordered_map<std::string, std::vector<std::string>> COMMANDS = {
     {LOAD, {"l"}},
@@ -76,6 +77,7 @@ const std::unordered_map<std::string, std::vector<std::string>> COMMANDS = {
     {QUIT, {"q"}},
     {PRINT_VERSION, {"-v"}},
     {PRINT_HELP, {"-h"}},
-    {ADD_MUSIC_TO_LIST, {"aml", "add"}},
-    {FUZZY_PLAY, {"fp", "fuzzy"}},
+    {ADD_MUSIC_TO_LIST, {"aml"}},
+    {FUZZY_PLAY, {"fp"}},
+    {FUZZY_PLAY_LATER, {"fpl"}}
 };
