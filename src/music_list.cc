@@ -15,58 +15,28 @@ MusicNode::MusicNode(std::string_view music)
 {
 }
 
-[[nodiscard]] const std::string MusicNode::getMusic() const
+MusicList::~MusicList()
 {
-    return music_;
+    this->clear();
 }
 
-// three situations:
-// 1. musicList->head_ == musicList->tail_ == NULL; no musicNode in List
-// 2. musicList->head_ == musicList->tail_ != NULL; only one musicNode in List
-// 3. musicList->head_ != musicList->tail_, head_ != NULL && tail_ != NULL,
-// head_->prev == NULL, tail_->next == NULL
-MusicList::MusicList(std::string_view list_file_path)
+void MusicList::load(std::string_view list_file_path)
 {
+    this->clear();
     std::filesystem::path list_file{list_file_path};
     std::ifstream file(list_file);
     if (file.is_open()) {
         std::string line;
         while (std::getline(file, line)) {
-            this->tailIn(line);
+            this->insertAfterTail(line);
         }
         file.close();
     }
     else {
         LOG(fmt::format("Failed to open file: {}", list_file_path), LogType::ERROR);
     }
-}
-MusicList::~MusicList()
-{
-    auto current = head_;
-    while (current) {
-        auto temp = current;
-        current   = current->next_;
-        temp->prev_.reset();
-        temp->next_.reset();
-        temp.reset();
-    }
-}
-
-void MusicList::load(std::string_view list_path)
-{
-    this->clear();
-    std::filesystem::path list{list_path};
-    std::ifstream file(list);
-    if (file.is_open()) {
-        std::string line;
-        while (std::getline(file, line)) {
-            this->tailIn(line);
-        }
-        file.close();
-    }
-    else {
-        LOG(fmt::format("Failed to open file: {}", list_path), LogType::ERROR);
-    }
+    current_      = head_;
+    next_to_play_ = current_;
 }
 
 [[nodiscard]] bool MusicList::isEmpty() const
@@ -81,191 +51,151 @@ void MusicList::load(std::string_view list_path)
 {
     std::vector<std::string> list;
     MusicNode* current = head_.get();
-    while (current != nullptr) {
+    do {
         list.push_back(current->music_);
         current = current->next_.get();
-    }
+    } while (current != head_.get());
+
     return list;
 }
 
-void MusicList::tailIn(std::string_view music)
+void MusicList::insertAfterTail(std::string_view music)
 {
     auto new_node = std::make_shared<MusicNode>(music);
     if (!head_) {
-        head_ = std::move(new_node);
+        head_ = new_node;
         tail_ = head_;
+
+        head_->prev_ = tail_;
+        head_->next_ = tail_;
+
+        tail_->prev_ = head_;
+        tail_->next_ = head_;
+
+        current_      = head_;
+        next_to_play_ = current_;
     }
     else {
         new_node->prev_ = tail_;
-        tail_->next_    = std::move(new_node);
+        tail_->next_    = new_node;
         tail_           = tail_->next_;
+
+        tail_->next_ = head_;
+        head_->prev_ = tail_;
     }
     count_ += 1;
 }
 
-std::shared_ptr<MusicNode> MusicList::headOut()
+void MusicList::insertAfterCurrent(std::string_view music)
 {
-    if (!head_) {
-        return nullptr;
+    if (!current_) {
+        LOG("current is null", LogType::ERROR);
+        return;
     }
-    auto result = head_;
-    head_       = head_->next_;
-    if (!head_) {
-        tail_ = nullptr;
-    }
-    else {
-        result->next_ = nullptr;
-        head_->prev_  = nullptr;
-    }
-    count_ -= 1;
-    return result;
-}
-
-std::shared_ptr<MusicNode> MusicList::tailOut()
-{
-    if (!head_) {
-        return nullptr;
-    }
-    auto result = tail_;
-    tail_       = tail_->prev_;
-    if (!tail_) {
-        head_ = nullptr;
-    }
-    else {
-        result->prev_ = nullptr;
-        tail_->next_  = nullptr;
-    }
-    count_ -= 1;
-    return result;
-}
-
-void MusicList::headIn(std::string_view music)
-{
-    auto new_node = std::make_shared<MusicNode>(music);
-    if (!head_) {
-        head_ = std::move(new_node);
-        tail_ = head_;
-    }
-    else {
-        new_node->next_ = head_;
-        head_->prev_    = new_node;
-        head_           = std::move(new_node);
-    }
+    auto new_node          = std::make_shared<MusicNode>(music);
+    new_node->prev_        = current_;
+    new_node->next_        = current_->next_;
+    current_->next_->prev_ = new_node;
+    current_->next_        = new_node;
     count_ += 1;
 }
 
-std::shared_ptr<MusicNode> MusicList::randomOut()
+void MusicList::forward()
 {
-    if (count_ == 0) {
-        return nullptr;
+    if (!current_) {
+        LOG("current is null", LogType::ERROR);
+        return;
     }
+    next_to_play_ = current_->next_;
+}
+
+void MusicList::backward()
+{
+    if (!current_) {
+        LOG("current is null", LogType::ERROR);
+        return;
+    }
+    next_to_play_ = current_->prev_;
+}
+
+void MusicList::shuffle()
+{
+    if (!current_) {
+        LOG("current is null", LogType::ERROR);
+        return;
+    }
+
+    // generate a random number between 1 and 100
+    // if the number is in the first half, move forward
+    // else move backward
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::shared_ptr<MusicNode> result(nullptr);
-    if (count_ < 100) {
-        std::uniform_int_distribution<int> dist(0, count_ - 1);
-        result = head_;
-        for (int i = 0; i < dist(gen); i++) {
-            result = result->next_;
+    std::uniform_int_distribution<int> dist(1, 100);
+    int step = dist(gen);
+
+    next_to_play_ = current_;
+    if (step <= 50) {
+        for (int i = 0; i < step; ++i) {
+            next_to_play_ = next_to_play_->next_;
         }
     }
     else {
-        std::uniform_int_distribution<int> dist(1, 100);
-        int index = dist(gen);
-        if (index < 50) {
-            result = head_;
-            for (int i = 0; i < index + 10; i++) {
-                result = result->next_;
-            }
-        }
-        else {
-            result = tail_;
-            for (int i = 0; i < index + 10; i++) {
-                result = result->prev_;
-            }
+        for (int i = 0; i < step - 50; ++i) {
+            next_to_play_ = next_to_play_->prev_;
         }
     }
-
-    if (result == head_) {
-        head_ = head_->next_;
-        if (head_) {
-            head_->prev_ = nullptr;
-        }
-        result->next_ = nullptr;
-    }
-    else if (result == tail_) {
-        tail_ = tail_->prev_;
-        if (tail_) {
-            tail_->next_ = nullptr;
-        }
-        result->prev_ = nullptr;
-    }
-    else {
-        result->prev_->next_ = result->next_;
-        result->next_->prev_ = result->prev_;
-        result->prev_        = nullptr;
-        result->next_        = nullptr;
-    }
-    count_ -= 1;
-    return result;
 }
 
-bool MusicList::contain(std::string_view music)
+bool MusicList::moveTo(std::string_view music)
 {
-    auto current = head_;
-    while (current) {
-        if (current->getMusic() == music) {
+    auto current = current_;
+    do {
+        if (current->music_ == music) {
+            next_to_play_ = current;
             return true;
         }
         current = current->next_;
-    }
+    } while (current != current_);
     return false;
 }
 
-bool MusicList::remove(std::string_view music)
+void MusicList::updateCurrent()
 {
-    auto current = head_;
-    while (current) {
-        if (current->getMusic() == music) {
-            if (current == head_) {
-                head_ = head_->next_;
-                if (head_) {
-                    head_->prev_ = nullptr;
-                }
-                current->next_ = nullptr;
-            }
-            else if (current == tail_) {
-                tail_ = tail_->prev_;
-                if (tail_) {
-                    tail_->next_ = nullptr;
-                }
-                current->prev_ = nullptr;
-            }
-            else {
-                current->prev_->next_ = current->next_;
-                current->next_->prev_ = current->prev_;
-                current->prev_        = nullptr;
-                current->next_        = nullptr;
-            }
-            current.reset();
-            count_ -= 1;
-            return true;
-        }
-        current = current->next_;
+    current_ = next_to_play_;
+}
+
+void MusicList::single()
+{
+    if (!current_) {
+        LOG("current is null", LogType::ERROR);
+        return;
     }
-    return false;
+    next_to_play_ = current_;
+}
+
+const std::optional<std::string> MusicList::getMusic() const
+{
+    if (!next_to_play_) {
+        LOG("next_to_play is null", LogType::ERROR);
+        return std::nullopt;
+    }
+    return next_to_play_->music_;
 }
 
 void MusicList::clear()
 {
-    auto current = head_;
-    while (current) {
-        auto temp = current;
-        current   = current->next_;
-        temp->prev_.reset();
-        temp->next_.reset();
-        temp.reset();
+    if (!head_) {
+        return;
     }
+
+    auto current = head_;
+    do {
+        auto temp   = current;
+        current     = current->next_;
+        temp->prev_ = nullptr;
+        temp->next_ = nullptr;
+        temp.reset();
+    } while (current != head_);
     head_  = nullptr;
     tail_  = nullptr;
     count_ = 0;

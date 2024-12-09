@@ -142,6 +142,47 @@ MaComponents::~MaComponents()
     sound_to_register_.reset();
 }
 
+ma_sound* MaComponents::getPlayingSound()
+{
+    ma_sound* sound = nullptr;
+    if (sound_to_play_->isPlaying() && !sound_to_register_->isPlaying()) {
+        sound = sound_to_play_->sound_.get();
+    }
+    else if (!sound_to_play_->isPlaying() && sound_to_register_->isPlaying()) {
+        sound = sound_to_register_->sound_.get();
+    }
+    return sound;
+}
+
+ma_result MaComponents::moveCursorToEnd()
+{
+    ma_sound* sound = this->getPlayingSound();
+    if (sound == nullptr) {
+        LOG("failed to get playing sound", LogType::ERROR);
+        return MA_ERROR;
+    }
+
+    ma_uint64 length = 0;
+    ma_result result = ma_sound_get_length_in_pcm_frames(sound, &length);
+    if (result != MA_SUCCESS) {
+        LOG("failed to get length in pcm frames", LogType::ERROR);
+        return result;
+    }
+    result = ma_sound_seek_to_pcm_frame(sound, length);
+    if (result != MA_SUCCESS) {
+        LOG("failed to seek to pcm frame", LogType::ERROR);
+        return result;
+    }
+    if (ma_sound_is_playing(sound) == 0U) {
+        result = ma_sound_start(sound);
+        if (result != MA_SUCCESS) {
+            LOG("failed to start sound", LogType::ERROR);
+            return result;
+        }
+    }
+    return MA_SUCCESS;
+}
+
 UserData::UserData(
     EnginePack* engine_pack,
     SoundPack* sound_to_play,
@@ -229,13 +270,25 @@ ma_result playInternal(
         return result;
     }
 
-    if (config->isRandom()) {
-        auto music = music_list->randomOut();
-        if (!music) {
-            LOG(fmt::format("failed to get random music: {}", music_to_play), LogType::ERROR);
-            return MA_ERROR;
-        }
-        music_list->headIn(music->getMusic());
+    // update the music playing
+    if (!music_list->moveTo(music_to_play)) {
+        LOG(fmt::format("failed to set playing music: {}", music_to_play), LogType::ERROR);
+    }
+    music_list->updateCurrent();
+
+    switch (config->getPlayMode()) {
+    case PlayMode::NORMAL:
+        music_list->forward();
+        break;
+    case PlayMode::SHUFFLE:
+        music_list->shuffle();
+        break;
+    case PlayMode::SINGLE:
+        music_list->single();
+        break;
+    default:
+        LOG("invalid play mode", LogType::ERROR);
+        throw std::runtime_error("invalid play mode");
     }
 
     auto* user_data(
@@ -297,19 +350,18 @@ void soundAtEndCallback(void* user_data, ma_sound* sound)
         LOG("got an invalid user_data", LogType::ERROR);
         throw std::runtime_error("got an invalid user_data");
     }
-    const std::string& music_playing = *(data->music_playing_);
-
-    if (!(data->config_->isRepetitive())) {
-        data->music_list_->remove(music_playing);
+    const std::optional<std::string>& music_to_play = data->music_list_->getMusic();
+    if (!music_to_play.has_value()) {
+        LOG("failed to get music", LogType::ERROR);
+        data->controller_->signalError();
+        delete data;
+        return;
     }
-    data->music_list_->tailIn(music_playing);
-
-    const std::string MUSIC_TO_PLAY = data->music_list_->headOut()->getMusic();
 
     ma_result result = playInternal(
         data->engine_pack_,
         data->sound_to_play_,
-        MUSIC_TO_PLAY,
+        music_to_play.value(),
         data->music_playing_,
         data->music_list_,
         data->sound_to_register_,
@@ -317,7 +369,7 @@ void soundAtEndCallback(void* user_data, ma_sound* sound)
         data->config_
     );
     if (result != MA_SUCCESS) {
-        LOG(fmt::format("failed to play music: {}", MUSIC_TO_PLAY), LogType::ERROR);
+        LOG(fmt::format("failed to play music: {}", music_to_play.value()), LogType::ERROR);
         data->controller_->signalError();
     }
     else {

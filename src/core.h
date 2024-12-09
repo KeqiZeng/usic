@@ -74,6 +74,9 @@ struct MaComponents
 
     MaComponents();
     ~MaComponents();
+
+    ma_sound* getPlayingSound();
+    ma_result moveCursorToEnd();
 };
 
 struct UserData

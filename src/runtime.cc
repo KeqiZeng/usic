@@ -28,72 +28,72 @@ NamedPipe::~NamedPipe()
 
 void NamedPipe::setup()
 {
-    if (access(this->PIPE_PATH_.data(), F_OK) != -1) {
+    if (access(PIPE_PATH_.data(), F_OK) != -1) {
         // if named pipe exists, delete it for initialization
-        if (unlink(this->PIPE_PATH_.data()) == -1) {
-            LOG(fmt::format("failed to delete named pipe {}", this->PIPE_PATH_), LogType::ERROR);
+        if (unlink(PIPE_PATH_.data()) == -1) {
+            LOG(fmt::format("failed to delete named pipe {}", PIPE_PATH_), LogType::ERROR);
             throw std::runtime_error("failed to delete named pipe");
         }
     }
 
-    if (mkfifo(this->PIPE_PATH_.data(), 0666)) {
-        LOG(fmt::format("failed to create named pipe {}", this->PIPE_PATH_), LogType::ERROR);
+    if (mkfifo(PIPE_PATH_.data(), 0666)) {
+        LOG(fmt::format("failed to create named pipe {}", PIPE_PATH_), LogType::ERROR);
         throw std::runtime_error("failed to create named pipe");
     }
-    LOG(fmt::format("created named pipe {}", this->PIPE_PATH_), LogType::INFO);
+    LOG(fmt::format("created named pipe {}", PIPE_PATH_), LogType::INFO);
 }
 
 void NamedPipe::openPipe(OpenMode open_mode)
 {
-    this->fd_ = open(this->PIPE_PATH_.data(), static_cast<int>(open_mode));
-    if (this->fd_ == -1) {
-        LOG(fmt::format("failed to open named pipe {}", this->PIPE_PATH_), LogType::ERROR);
+    fd_ = open(PIPE_PATH_.data(), static_cast<int>(open_mode));
+    if (fd_ == -1) {
+        LOG(fmt::format("failed to open named pipe {}", PIPE_PATH_), LogType::ERROR);
         throw std::runtime_error("failed to open named pipe");
     }
-    this->mode_ = open_mode;
+    mode_ = open_mode;
 }
 
 void NamedPipe::closePipe()
 {
-    if (this->fd_ != -1)
-        close(this->fd_);
+    if (fd_ != -1)
+        close(fd_);
 }
 
 void NamedPipe::deletePipe()
 {
-    unlink(this->PIPE_PATH_.data());
-    LOG(fmt::format("deleted named pipe {}", this->PIPE_PATH_), LogType::INFO);
+    unlink(PIPE_PATH_.data());
+    LOG(fmt::format("deleted named pipe {}", PIPE_PATH_), LogType::INFO);
 }
 
 int NamedPipe::getFd()
 {
-    return this->fd_;
+    return fd_;
 }
 
 void NamedPipe::writeIn(std::string_view msg)
 {
-    if (this->mode_ != OpenMode::WR_ONLY_BLOCK) {
-        LOG(fmt::format("named pipe {} is not writable", this->PIPE_PATH_), LogType::ERROR);
+    if (mode_ != OpenMode::WR_ONLY_BLOCK) {
+        LOG(fmt::format("named pipe {} is not writable", PIPE_PATH_), LogType::ERROR);
         return;
     }
 
-    ssize_t bytes_written = write(this->fd_, msg.data(), msg.size());
+    ssize_t bytes_written = write(fd_, msg.data(), msg.size());
     if (bytes_written == -1) {
-        LOG(fmt::format("failed to write to named pipe {}", this->PIPE_PATH_), LogType::ERROR);
+        LOG(fmt::format("failed to write to named pipe {}", PIPE_PATH_), LogType::ERROR);
     }
 }
 
 std::string NamedPipe::readOut()
 {
-    if (this->mode_ != OpenMode::RD_ONLY_BLOCK) {
-        LOG(fmt::format("named pipe {} is not readable", this->PIPE_PATH_), LogType::ERROR);
+    if (mode_ != OpenMode::RD_ONLY_BLOCK) {
+        LOG(fmt::format("named pipe {} is not readable", PIPE_PATH_), LogType::ERROR);
         return "";
     }
     std::string msg;
     msg.resize(1024);
-    ssize_t bytes_read = read(this->fd_, msg.data(), 1024);
+    ssize_t bytes_read = read(fd_, msg.data(), 1024);
     if (bytes_read == -1) {
-        LOG(fmt::format("failed to read from named pipe {}", this->PIPE_PATH_), LogType::ERROR);
+        LOG(fmt::format("failed to read from named pipe {}", PIPE_PATH_), LogType::ERROR);
         return "";
     }
     else {
@@ -102,56 +102,53 @@ std::string NamedPipe::readOut()
     return msg;
 }
 
-Config::Config(bool repetitive, bool random, std::string_view usic_library, std::string_view play_list_path)
-    : repetitive_(repetitive)
-    , random_(random)
+// Config::Config(bool random, bool single_loop, std::string_view usic_library, std::string_view play_list_path)
+//     : random_(random)
+//     , single_loop_(single_loop)
+Config::Config(std::string_view usic_library, std::string_view play_list_path, PlayMode mode)
+    : mode_{mode}
 {
     if (usic_library.empty()) {
         LOG("usicLibrary can not be empty", LogType::ERROR);
         throw std::runtime_error("usicLibrary can not be empty");
     }
     if (usic_library.back() != '/') {
-        this->usic_library_ = fmt::format("{}{}", usic_library, '/');
+        usic_library_ = fmt::format("{}{}", usic_library, '/');
     }
     else {
-        this->usic_library_ = usic_library;
+        usic_library_ = usic_library;
     }
 
     if (play_list_path.empty()) {
         LOG("playListPath is empty, use USIC_LIBARY as default", LogType::INFO);
-        this->play_list_path_ = this->usic_library_;
+        play_list_path_ = usic_library_;
     }
     if (play_list_path.back() != '/') {
-        this->play_list_path_ = fmt::format("{}{}{}", this->usic_library_, play_list_path, '/');
+        play_list_path_ = fmt::format("{}{}{}", usic_library_, play_list_path, '/');
     }
     else {
-        this->play_list_path_ = fmt::format("{}{}", this->usic_library_, play_list_path);
+        play_list_path_ = fmt::format("{}{}", usic_library_, play_list_path);
     }
 }
 
-bool Config::isRepetitive()
-{
-    return this->repetitive_;
-}
-bool Config::isRandom()
-{
-    return this->random_;
-}
-void Config::toggleRandom()
-{
-    this->random_ = !this->random_;
-}
-void Config::toggleRepetitive()
-{
-    this->repetitive_ = !this->repetitive_;
-}
 std::string Config::getUsicLibrary()
 {
-    return this->usic_library_;
+    return usic_library_;
 }
+
 std::string Config::getPlayListPath()
 {
-    return this->play_list_path_;
+    return play_list_path_;
+}
+
+PlayMode Config::getPlayMode()
+{
+    return mode_;
+}
+
+void Config::setPlayMode(PlayMode mode)
+{
+    mode_ = mode;
 }
 
 bool isServerRunning()

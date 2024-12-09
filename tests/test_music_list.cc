@@ -1,116 +1,135 @@
 #include "music_list.h"
-#include "runtime.h"
 #include <catch2/catch_test_macros.hpp>
+#include <iostream>
 
 TEST_CASE("The methods of MusicList can work properly")
 {
     SECTION("MusicList can be initialized from a file")
     {
-        auto config    = std::make_unique<Config>(false, false, "./tests", "playLists/");
-        auto musicList = std::make_unique<MusicList>(fmt::format("{}{}", config->getPlayListPath(), "music_list.txt"));
+        auto music_list = std::make_unique<MusicList>();
+        CHECK(music_list->isEmpty());
 
-        CHECK(musicList->getCount() == 12);
+        music_list->load("./tests/playLists/music_list.txt");
+
+        CHECK(music_list->getCount() == 12);
         CHECK(
-            musicList->getList() == std::vector<std::string>(
-                                        {"Beyond-情人.flac",
-                                         "李宗盛-山丘.wav",
-                                         "赵雷-南方姑娘 (Live).mp3",
-                                         "Beyond-灰色轨迹.flac",
-                                         "Beyond-海阔天空.wav",
-                                         "Anne-Sophie Versnaeyen,Gabriel "
-                                         "Saban,Philippe Briand-Shining Horizon.flac",
-                                         "Beyond-谁伴我闯荡 91.flac",
-                                         "Beyond-灰色轨迹 91.flac",
-                                         "Beyond-冷雨夜 91.flac",
-                                         "Anne-Sophie Versnaeyen,Gabriel "
-                                         "Saban-Facing the Past.flac",
-                                         "赵雷-我记得.wav",
-                                         "Beyond-海阔天空 05.mp3"}
-                                    )
+            music_list->getList() == std::vector<std::string>(
+                                         {"Beyond-情人.flac",
+                                          "李宗盛-山丘.wav",
+                                          "赵雷-南方姑娘 (Live).mp3",
+                                          "Beyond-灰色轨迹.flac",
+                                          "Beyond-海阔天空.wav",
+                                          "Anne-Sophie Versnaeyen,Gabriel "
+                                          "Saban,Philippe Briand-Shining Horizon.flac",
+                                          "Beyond-谁伴我闯荡 91.flac",
+                                          "Beyond-灰色轨迹 91.flac",
+                                          "Beyond-冷雨夜 91.flac",
+                                          "Anne-Sophie Versnaeyen,Gabriel "
+                                          "Saban-Facing the Past.flac",
+                                          "赵雷-我记得.wav",
+                                          "Beyond-海阔天空 05.mp3"}
+                                     )
         );
     }
 
-    SECTION("Check randomOut can work properly when the count_ is less than 100")
+    SECTION("Check insertAfterTail, forward, backward, moveTo and updateCurrent can work properly")
     {
-        std::unique_ptr<MusicList> musicList(new MusicList());
-        musicList->tailIn("A");
-        auto music_1 = musicList->randomOut();
-        CHECK(music_1->getMusic() == "A");
-        CHECK(musicList->getCount() == 0);
+        auto music_list = std::make_unique<MusicList>();
+        music_list->insertAfterTail("A");
+        music_list->insertAfterTail("B");
+        music_list->insertAfterTail("C");
+        music_list->insertAfterTail("D");
+        music_list->insertAfterTail("E");
 
-        musicList->tailIn("W");
-        musicList->tailIn("X");
-        musicList->tailIn("Y");
-        musicList->tailIn("Z");
-        auto originList = musicList->getList();
-        std::sort(originList.begin(), originList.end());
-        auto rOut     = musicList->randomOut()->getMusic();
-        auto restList = musicList->getList();
-        restList.push_back(rOut);
-        std::sort(restList.begin(), restList.end());
-        CHECK(restList == originList);
-        CHECK(musicList->getCount() == 3);
+        CHECK(music_list->getCount() == 5);
+
+        CHECK(music_list->getMusic().value() == "A");
+        music_list->forward();
+        music_list->updateCurrent();
+        CHECK(music_list->getMusic().value() == "B");
+        music_list->forward();
+        music_list->updateCurrent();
+        CHECK(music_list->getMusic().value() == "C");
+        music_list->forward();
+        music_list->updateCurrent();
+        CHECK(music_list->getMusic().value() == "D");
+        music_list->forward();
+        music_list->updateCurrent();
+        CHECK(music_list->getMusic().value() == "E");
+        music_list->forward();
+        music_list->updateCurrent();
+        CHECK(music_list->getMusic().value() == "A");
+
+        music_list->backward();
+        music_list->updateCurrent();
+        CHECK(music_list->getMusic().value() == "E");
+        music_list->backward();
+        music_list->updateCurrent();
+        CHECK(music_list->getMusic().value() == "D");
+        music_list->backward();
+        music_list->updateCurrent();
+        CHECK(music_list->getMusic().value() == "C");
+        music_list->backward();
+        music_list->updateCurrent();
+        CHECK(music_list->getMusic().value() == "B");
+        music_list->backward();
+        music_list->updateCurrent();
+        CHECK(music_list->getMusic().value() == "A");
+
+        music_list->moveTo("C");
+        CHECK(music_list->getMusic().value() == "C");
+        music_list->moveTo("A");
+        CHECK(music_list->getMusic().value() == "A");
+        music_list->moveTo("E");
+        CHECK(music_list->getMusic().value() == "E");
+        music_list->moveTo("B");
+        CHECK(music_list->getMusic().value() == "B");
+        music_list->moveTo("D");
+        CHECK(music_list->getMusic().value() == "D");
     }
 
-    SECTION("Check randomOut can work properly when the count_ is larger than 100")
+    SECTION("Check insertAfterCurrent and clear can work properly")
     {
-        std::unique_ptr<MusicList> musicList(new MusicList());
-        for (int i = 0; i < 240; i++) {
-            musicList->headIn(std::to_string(i));
-        }
-        auto originList = musicList->getList();
-        std::sort(originList.begin(), originList.end());
-        int originCount = musicList->getCount();
+        auto music_list = std::make_unique<MusicList>();
+        music_list->insertAfterTail("A");
+        music_list->insertAfterTail("B");
+        music_list->insertAfterTail("C");
+        music_list->insertAfterTail("D");
+        music_list->insertAfterTail("E");
 
-        auto rOut     = musicList->randomOut()->getMusic();
-        auto restList = musicList->getList();
-        restList.push_back(rOut);
-        std::sort(restList.begin(), restList.end());
-        int restCount = musicList->getCount();
-        restCount += 1;
-        CHECK(restList == originList);
-        CHECK(originCount == restCount);
-    }
+        music_list->insertAfterCurrent("F");
+        CHECK(music_list->getCount() == 6);
+        music_list->forward();
+        music_list->updateCurrent();
+        CHECK(music_list->getMusic().value() == "F");
 
-    SECTION("Operations on musicList can work well")
-    {
-        std::unique_ptr<MusicList> musicList(new MusicList());
-        CHECK(musicList->isEmpty());
-        musicList->tailIn("A");
-        CHECK(musicList->headOut()->getMusic() == "A");
-        musicList->headIn("B");
-        CHECK(musicList->tailOut()->getMusic() == "B");
+        music_list->forward();
+        music_list->updateCurrent();
+        CHECK(music_list->getMusic().value() == "B");
 
-        musicList->tailIn("A");
-        musicList->tailIn("B");
-        CHECK(musicList->getCount() == 2);
-        CHECK(musicList->getList() == std::vector<std::string>({"A", "B"}));
+        music_list->insertAfterCurrent("G");
+        music_list->insertAfterCurrent("H");
+        music_list->insertAfterCurrent("I");
+        music_list->insertAfterCurrent("J");
 
-        CHECK(musicList->headOut()->getMusic() == "A");
-        CHECK(musicList->getCount() == 1);
+        CHECK(music_list->getCount() == 10);
+        CHECK(music_list->getList() == std::vector<std::string>({"A", "F", "B", "J", "I", "H", "G", "C", "D", "E"}));
 
-        musicList->headIn("C");
-        musicList->headIn("D");
-        CHECK(musicList->getCount() == 3);
-        CHECK(musicList->getList() == std::vector<std::string>({"D", "C", "B"}));
+        music_list->moveTo("I");
+        music_list->updateCurrent();
+        music_list->insertAfterCurrent("K");
+        music_list->insertAfterCurrent("L");
+        music_list->insertAfterCurrent("M");
+        music_list->insertAfterCurrent("N");
+        music_list->insertAfterCurrent("O");
 
-        CHECK(musicList->tailOut()->getMusic() == "B");
-        CHECK(musicList->getCount() == 2);
-        CHECK(musicList->getList() == std::vector<std::string>({"D", "C"}));
+        CHECK(music_list->getCount() == 15);
+        CHECK(
+            music_list->getList() ==
+            std::vector<std::string>({"A", "F", "B", "J", "I", "O", "N", "M", "L", "K", "H", "G", "C", "D", "E"})
+        );
 
-        CHECK(musicList->contain("C"));
-        musicList->remove("C");
-        CHECK(!musicList->contain("C"));
-        CHECK(musicList->getCount() == 1);
-
-        musicList->clear();
-        CHECK(musicList->isEmpty());
-
-        auto music_null = musicList->headOut();
-        CHECK(music_null == nullptr);
-        music_null = musicList->tailOut();
-        CHECK(music_null == nullptr);
-        music_null = musicList->randomOut();
-        CHECK(music_null == nullptr);
+        music_list->clear();
+        CHECK(music_list->isEmpty());
     }
 }

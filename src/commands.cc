@@ -2,6 +2,7 @@
 #include "config.h"
 #include "core.h"
 #include "fmt/core.h"
+#include "miniaudio.h"
 #include "music_list.h"
 #include "runtime.h"
 #include "utils.h"
@@ -26,22 +27,6 @@ const std::string Progress::makeBar()
     std::string bar(PROGRESS_BAR_LENGTH, BAR_ELEMENT);
     bar[n] = CURSOR_ELEMENT;
     return fmt::format("{}\n{} {}", music_name_, bar, progress_);
-}
-
-static ma_sound* getPlayingSound(MaComponents* ma_comp)
-{
-    ma_sound* sound = nullptr;
-    if (!ma_comp) {
-        LOG("got an invalid MaComponents", LogType::ERROR);
-        return sound;
-    }
-    if (ma_comp->sound_to_play_->isPlaying() && !ma_comp->sound_to_register_->isPlaying()) {
-        sound = ma_comp->sound_to_play_->sound_.get();
-    }
-    else if (!ma_comp->sound_to_play_->isPlaying() && ma_comp->sound_to_register_->isPlaying()) {
-        sound = ma_comp->sound_to_register_->sound_.get();
-    }
-    return sound;
 }
 
 namespace commands
@@ -83,8 +68,8 @@ ma_result play(
         }
     }
     else {
-        playLater(config, music_to_play, music_list);
-        result = playNext(ma_comp);
+        playLater(music_to_play, music_list, config);
+        result = ma_comp->moveCursorToEnd();
         if (result != MA_SUCCESS) {
             LOG(fmt::format("failed to play music: {}", music_to_play), LogType::ERROR);
         }
@@ -92,45 +77,26 @@ ma_result play(
     return result;
 }
 
-void playLater(Config* config, std::string_view music, MusicList* music_list)
+void playLater(std::string_view music, MusicList* music_list, Config* config)
 {
     if (!music_list) {
         LOG("got an invalid music_list", LogType::ERROR);
         return;
     }
-    if (!config->isRepetitive()) {
-        music_list->remove(music);
+    if (!music_list->moveTo(music)) {
+        music_list->insertAfterCurrent(music);
+        music_list->forward();
     }
-    music_list->headIn(music);
 }
 
-ma_result playNext(MaComponents* ma_comp)
+ma_result playNext(MaComponents* ma_comp, MusicList* music_list)
 {
-    ma_sound* sound = getPlayingSound(ma_comp);
-    if (sound == nullptr) {
-        LOG("failed to get playing sound", LogType::ERROR);
+    if (!music_list || music_list->isEmpty()) {
+        LOG("got an invalid music_list", LogType::ERROR);
         return MA_ERROR;
     }
-
-    ma_uint64 length = 0;
-    ma_result result = ma_sound_get_length_in_pcm_frames(sound, &length);
-    if (result != MA_SUCCESS) {
-        LOG("failed to get length in pcm frames", LogType::ERROR);
-        return result;
-    }
-    result = ma_sound_seek_to_pcm_frame(sound, length);
-    if (result != MA_SUCCESS) {
-        LOG("failed to seek to pcm frame", LogType::ERROR);
-        return result;
-    }
-    if (ma_sound_is_playing(sound) == 0U) {
-        result = ma_sound_start(sound);
-        if (result != MA_SUCCESS) {
-            LOG("failed to start sound", LogType::ERROR);
-            return result;
-        }
-    }
-    return MA_SUCCESS;
+    music_list->forward();
+    return ma_comp->moveCursorToEnd();
 }
 
 ma_result playPrev(MaComponents* ma_comp, MusicList* music_list)
@@ -139,18 +105,13 @@ ma_result playPrev(MaComponents* ma_comp, MusicList* music_list)
         LOG("got an invalid music_list", LogType::ERROR);
         return MA_ERROR;
     }
-    auto prev_music = music_list->tailOut();
-    if (prev_music == nullptr) {
-        LOG("failed to get prev music", LogType::ERROR);
-        return MA_ERROR;
-    }
-    music_list->headIn(prev_music->getMusic());
-    return playNext(ma_comp);
+    music_list->backward();
+    return ma_comp->moveCursorToEnd();
 }
 
 ma_result pause(MaComponents* ma_comp)
 {
-    ma_sound* sound = getPlayingSound(ma_comp);
+    ma_sound* sound = ma_comp->getPlayingSound();
     if (sound == nullptr) {
         LOG("failed to get playing sound", LogType::ERROR);
         return MA_ERROR;
@@ -178,7 +139,7 @@ ma_result pause(MaComponents* ma_comp)
 
 static ma_result seekDiff(MaComponents* ma_comp, int seconds)
 {
-    ma_sound* sound = getPlayingSound(ma_comp);
+    ma_sound* sound = ma_comp->getPlayingSound();
     if (sound == nullptr) {
         LOG("failed to get playing sound", LogType::ERROR);
         return MA_ERROR;
@@ -230,7 +191,7 @@ ma_result seekBackward(MaComponents* ma_comp)
 
 ma_result seekTo(MaComponents* ma_comp, std::string_view time)
 {
-    ma_sound* sound = getPlayingSound(ma_comp);
+    ma_sound* sound = ma_comp->getPlayingSound();
     if (sound == nullptr) {
         LOG("failed to get playing sound", LogType::ERROR);
         return MA_ERROR;
@@ -269,7 +230,7 @@ ma_result seekTo(MaComponents* ma_comp, std::string_view time)
 
 ma_result getProgress(MaComponents* ma_comp, const std::string& music_playing, Progress* current_progress)
 {
-    ma_sound* sound = getPlayingSound(ma_comp);
+    ma_sound* sound = ma_comp->getPlayingSound();
     if (sound == nullptr) {
         LOG("failed to get playing sound", LogType::ERROR);
         return MA_ERROR;
@@ -373,13 +334,28 @@ ma_result mute(EnginePack* engine)
     return engine->setVolume(0.0F);
 }
 
-void setRandom(Config* config)
+void setMode(PlayMode mode, MusicList* music_list, Config* config)
 {
-    config->toggleRandom();
+    switch (mode) {
+    case PlayMode::NORMAL:
+        music_list->forward();
+        break;
+    case PlayMode::SHUFFLE:
+        music_list->shuffle();
+        break;
+    case PlayMode::SINGLE:
+        music_list->single();
+        break;
+    default:
+        LOG("got an invalid PlayMode", LogType::ERROR);
+        return;
+    }
+    config->setPlayMode(mode);
 }
-void setRepetitive(Config* config)
+
+PlayMode getMode(Config* config)
 {
-    config->toggleRepetitive();
+    return config->getPlayMode();
 }
 
 std::vector<std::string> getList(MusicList* music_list)

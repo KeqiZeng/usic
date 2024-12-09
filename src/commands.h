@@ -4,6 +4,7 @@
 #include "core.h"
 #include "miniaudio.h"
 #include "music_list.h"
+#include "runtime.h"
 
 class Progress
 {
@@ -30,8 +31,8 @@ ma_result play(
     Config* config
 );
 
-void playLater(Config* config, std::string_view music, MusicList* music_list);
-ma_result playNext(MaComponents* ma_comp);
+void playLater(std::string_view music, MusicList* music_list, Config* config);
+ma_result playNext(MaComponents* ma_comp, MusicList* music_list);
 ma_result playPrev(MaComponents* ma_comp, MusicList* music_list);
 ma_result pause(MaComponents* ma_comp);
 ma_result seekForward(MaComponents* ma_comp);
@@ -43,8 +44,8 @@ ma_result volumeDown(EnginePack* engine);
 ma_result setVolume(EnginePack* engine, std::string_view volume_str);
 float getVolume(EnginePack* engine);
 ma_result mute(EnginePack* engine);
-void setRandom(Config* config);
-void setRepetitive(Config* config);
+void setMode(PlayMode mode, MusicList* music_list, Config* config);
+PlayMode getMode(Config* config);
 std::vector<std::string> getList(MusicList* music_list);
 void quit(MaComponents* ma_comp, Controller* controller);
 

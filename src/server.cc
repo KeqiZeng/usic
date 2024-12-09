@@ -144,7 +144,7 @@ void handleCommand(
             ma_result result = commands::play(ma_comp, music_to_play, music_playing, music_list, controller, config);
             if (result != MA_SUCCESS) {
                 logErrorAndSendToClient(
-                    fmt::format("Failed to play music: {}", music_to_play),
+                    fmt::format("failed to play music: {}", music_to_play),
                     pipe_to_server,
                     pipe_to_client
                 );
@@ -154,11 +154,16 @@ void handleCommand(
             }
         }
         else {
-            const std::string& music_to_play = music_list->headOut()->getMusic();
-            ma_result result = commands::play(ma_comp, music_to_play, music_playing, music_list, controller, config);
+            const std::optional<std::string>& music_to_play = music_list->getMusic();
+            if (!music_to_play.has_value()) {
+                logErrorAndSendToClient("failed to get music to play", pipe_to_server, pipe_to_client);
+            }
+
+            ma_result result =
+                commands::play(ma_comp, music_to_play.value(), music_playing, music_list, controller, config);
             if (result != MA_SUCCESS) {
                 logErrorAndSendToClient(
-                    fmt::format("Failed to play music: {}", music_to_play),
+                    fmt::format("failed to play music: {}", music_to_play.value()),
                     pipe_to_server,
                     pipe_to_client
                 );
@@ -171,7 +176,7 @@ void handleCommand(
     else if (utils::commandEq(sub_cmd, PLAY_LATER)) {
         if (args.size() >= 2) {
             const std::string& music_to_play = args.at(1);
-            commands::playLater(config, music_to_play, music_list);
+            commands::playLater(music_to_play, music_list, config);
             sendMsgToClient(NO_MESSAGE, pipe_to_server, pipe_to_client);
         }
         else {
@@ -183,9 +188,9 @@ void handleCommand(
         }
     }
     else if (utils::commandEq(sub_cmd, PLAY_NEXT)) {
-        ma_result result = commands::playNext(ma_comp);
+        ma_result result = commands::playNext(ma_comp, music_list);
         if (result != MA_SUCCESS) {
-            logErrorAndSendToClient("Failed to play next music", pipe_to_server, pipe_to_client);
+            logErrorAndSendToClient("failed to play next music", pipe_to_server, pipe_to_client);
         }
         else {
             sendMsgToClient(NO_MESSAGE, pipe_to_server, pipe_to_client);
@@ -194,7 +199,7 @@ void handleCommand(
     else if (utils::commandEq(sub_cmd, PLAY_PREV)) {
         ma_result result = commands::playPrev(ma_comp, music_list);
         if (result != MA_SUCCESS) {
-            logErrorAndSendToClient("Failed to play prev music", pipe_to_server, pipe_to_client);
+            logErrorAndSendToClient("failed to play prev music", pipe_to_server, pipe_to_client);
         }
         else {
             sendMsgToClient(NO_MESSAGE, pipe_to_server, pipe_to_client);
@@ -203,7 +208,7 @@ void handleCommand(
     else if (utils::commandEq(sub_cmd, PAUSE)) {
         ma_result result = commands::pause(ma_comp);
         if (result != MA_SUCCESS) {
-            logErrorAndSendToClient("Failed to pause/resume music", pipe_to_server, pipe_to_client);
+            logErrorAndSendToClient("failed to pause/resume music", pipe_to_server, pipe_to_client);
         }
         else {
             sendMsgToClient(NO_MESSAGE, pipe_to_server, pipe_to_client);
@@ -212,7 +217,7 @@ void handleCommand(
     else if (utils::commandEq(sub_cmd, SEEK_FORWARD)) {
         ma_result result = commands::seekForward(ma_comp);
         if (result != MA_SUCCESS) {
-            logErrorAndSendToClient("Failed to move cursor forward", pipe_to_server, pipe_to_client);
+            logErrorAndSendToClient("failed to move cursor forward", pipe_to_server, pipe_to_client);
         }
         else {
             sendMsgToClient(NO_MESSAGE, pipe_to_server, pipe_to_client);
@@ -221,7 +226,7 @@ void handleCommand(
     else if (utils::commandEq(sub_cmd, SEEK_BACKWARD)) {
         ma_result result = commands::seekBackward(ma_comp);
         if (result != MA_SUCCESS) {
-            logErrorAndSendToClient("Failed to move cursor backward", pipe_to_server, pipe_to_client);
+            logErrorAndSendToClient("failed to move cursor backward", pipe_to_server, pipe_to_client);
         }
         else {
             sendMsgToClient(NO_MESSAGE, pipe_to_server, pipe_to_client);
@@ -232,18 +237,21 @@ void handleCommand(
             const std::string& time = args.at(1);
             ma_result result        = commands::seekTo(ma_comp, time);
             if (result != MA_SUCCESS) {
-                logErrorAndSendToClient("Failed to set cursor", pipe_to_server, pipe_to_client);
+                logErrorAndSendToClient("failed to set cursor", pipe_to_server, pipe_to_client);
             }
             else {
                 sendMsgToClient(NO_MESSAGE, pipe_to_server, pipe_to_client);
             }
+        }
+        else {
+            logErrorAndSendToClient(fmt::format("{}: not enough arguments.", SEEK_TO), pipe_to_server, pipe_to_client);
         }
     }
     else if (utils::commandEq(sub_cmd, GET_PROGRESS)) {
         auto progress    = std::make_unique<Progress>();
         ma_result result = commands::getProgress(ma_comp, *music_playing, progress.get());
         if (result != MA_SUCCESS) {
-            logErrorAndSendToClient("Failed to get progress", pipe_to_server, pipe_to_client);
+            logErrorAndSendToClient("failed to get progress", pipe_to_server, pipe_to_client);
         }
         else {
             sendMsgToClient(progress->makeBar(), pipe_to_server, pipe_to_client);
@@ -252,7 +260,7 @@ void handleCommand(
     else if (utils::commandEq(sub_cmd, VOLUME_UP)) {
         ma_result result = commands::volumeUp(ma_comp->engine_pack_.get());
         if (result != MA_SUCCESS) {
-            logErrorAndSendToClient("Failed to turn the volume up", pipe_to_server, pipe_to_client);
+            logErrorAndSendToClient("failed to turn the volume up", pipe_to_server, pipe_to_client);
         }
         else {
             sendMsgToClient(NO_MESSAGE, pipe_to_server, pipe_to_client);
@@ -261,7 +269,7 @@ void handleCommand(
     else if (utils::commandEq(sub_cmd, VOLUME_DOWN)) {
         ma_result result = commands::volumeDown(ma_comp->engine_pack_.get());
         if (result != MA_SUCCESS) {
-            logErrorAndSendToClient("Failed to turn the volume down", pipe_to_server, pipe_to_client);
+            logErrorAndSendToClient("failed to turn the volume down", pipe_to_server, pipe_to_client);
         }
         else {
             sendMsgToClient(NO_MESSAGE, pipe_to_server, pipe_to_client);
@@ -272,7 +280,7 @@ void handleCommand(
             const std::string& volume = args.at(1);
             ma_result result          = commands::setVolume(ma_comp->engine_pack_.get(), volume);
             if (result != MA_SUCCESS) {
-                logErrorAndSendToClient("Failed to set volume", pipe_to_server, pipe_to_client);
+                logErrorAndSendToClient("failed to set volume", pipe_to_server, pipe_to_client);
             }
             else {
                 sendMsgToClient(NO_MESSAGE, pipe_to_server, pipe_to_client);
@@ -288,38 +296,63 @@ void handleCommand(
     }
     else if (utils::commandEq(sub_cmd, GET_VOLUME)) {
         float volume = commands::getVolume(ma_comp->engine_pack_.get());
-        sendMsgToClient(fmt::format("Volume: {}", volume), pipe_to_server, pipe_to_client);
-        // if (result != MA_SUCCESS) {
-        //     logErrorAndSendToClient("Failed to get volume", pipe_to_server, pipe_to_client);
-        // }
-        // else {
-        //     sendMsgToClient(fmt::format("Volume: {}", volume), pipe_to_server, pipe_to_client);
-        // }
+        sendMsgToClient(fmt::format("volume: {}", volume), pipe_to_server, pipe_to_client);
     }
     else if (utils::commandEq(sub_cmd, MUTE)) {
         ma_result result = commands::mute(ma_comp->engine_pack_.get());
         if (result != MA_SUCCESS) {
-            logErrorAndSendToClient("Failed to (un)mute", pipe_to_server, pipe_to_client);
+            logErrorAndSendToClient("failed to (un)mute", pipe_to_server, pipe_to_client);
         }
         else {
             sendMsgToClient(NO_MESSAGE, pipe_to_server, pipe_to_client);
         }
     }
-    else if (utils::commandEq(sub_cmd, SET_RANDOM)) {
-        commands::setRandom(config);
-        sendMsgToClient(
-            fmt::format("random: {}", config->isRandom() ? "enabled" : "disabled"),
-            pipe_to_server,
-            pipe_to_client
-        );
+    else if (utils::commandEq(sub_cmd, SET_MODE)) {
+        if (args.size() >= 2) {
+            const std::string& mode_str = args.at(1);
+            PlayMode mode;
+            if (mode_str == "normal") {
+                mode = PlayMode::NORMAL;
+            }
+            else if (mode_str == "shuffle") {
+                mode = PlayMode::SHUFFLE;
+            }
+            else if (mode_str == "single") {
+                mode = PlayMode::SINGLE;
+            }
+            else {
+                logErrorAndSendToClient(
+                    fmt::format("{}: invalid mode: {}", SET_MODE, mode_str),
+                    pipe_to_server,
+                    pipe_to_client
+                );
+                return;
+            }
+            commands::setMode(mode, music_list, config);
+            sendMsgToClient(NO_MESSAGE, pipe_to_server, pipe_to_client);
+        }
+        else {
+            logErrorAndSendToClient(fmt::format("{}: not enough arguments.", SET_MODE), pipe_to_server, pipe_to_client);
+        }
     }
-    else if (utils::commandEq(sub_cmd, SET_REPETITIVE)) {
-        commands::setRepetitive(config);
-        sendMsgToClient(
-            fmt::format("repetitive: {}", config->isRepetitive() ? "enabled" : "disabled"),
-            pipe_to_server,
-            pipe_to_client
-        );
+    else if (utils::commandEq(sub_cmd, GET_MODE)) {
+        PlayMode mode = commands::getMode(config);
+        std::string mode_str;
+        switch (mode) {
+        case PlayMode::NORMAL:
+            mode_str = "normal";
+            break;
+        case PlayMode::SHUFFLE:
+            mode_str = "shuffle";
+            break;
+        case PlayMode::SINGLE:
+            mode_str = "single";
+            break;
+        default:
+            mode_str = "unknown";
+            break;
+        }
+        sendMsgToClient(fmt::format("mode: {}", mode_str), pipe_to_server, pipe_to_client);
     }
     else if (utils::commandEq(sub_cmd, GET_LIST)) {
         std::vector<std::string> list = commands::getList(music_list);
@@ -327,7 +360,7 @@ void handleCommand(
     }
     else if (utils::commandEq(sub_cmd, QUIT)) {
         commands::quit(ma_comp, controller);
-        sendMsgToClient("Server quit successfully", pipe_to_server, pipe_to_client);
+        sendMsgToClient("server quit successfully", pipe_to_server, pipe_to_client);
     }
     else {
         logErrorAndSendToClient(fmt::format("unknown command: {}", sub_cmd), pipe_to_server, pipe_to_client);
@@ -341,8 +374,8 @@ void server()
     auto pipe_to_client = std::make_unique<NamedPipe>(PIPE_TO_CLIENT);
     setupRuntime(pipe_to_server.get(), pipe_to_client.get()); // throw fatal error
 
-    auto config  = std::make_unique<Config>(REPETITIVE, RANDOM, USIC_LIBRARY, PLAY_LISTS_PATH); // throw fatal error
-    auto ma_comp = std::make_unique<MaComponents>();                                            // throw fatal error
+    auto config  = std::make_unique<Config>(USIC_LIBRARY, PLAY_LISTS_PATH, DEFAULT_PLAY_MODE); // throw fatal error
+    auto ma_comp = std::make_unique<MaComponents>();                                           // throw fatal error
 
     auto music_list = std::make_unique<MusicList>();
     initMusicList(music_list.get(), config.get()); // throw fatal error
@@ -378,6 +411,7 @@ void server()
     }
     catch (std::exception& e) {
         controller->quit();
+        fmt::print(stderr, "{}\n", e.what());
         throw std::runtime_error(e.what());
     }
     pipe_to_server->deletePipe();

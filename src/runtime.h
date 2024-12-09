@@ -27,6 +27,13 @@ enum class OpenMode
     WR_ONLY_BLOCK = O_WRONLY,
 };
 
+enum class PlayMode
+{
+    NORMAL,
+    SHUFFLE,
+    SINGLE,
+};
+
 // for named pipes communication
 const std::string OVER       = "OVER";
 const std::string GOT        = "GOT";
@@ -55,19 +62,17 @@ class NamedPipe
 class Config
 {
   public:
-    Config(bool repetitive, bool random, std::string_view usic_library, std::string_view play_list_path);
-    bool isRepetitive();
-    bool isRandom();
-    void toggleRandom();
-    void toggleRepetitive();
+    // Config(bool random, bool single_loop, std::string_view usic_library, std::string_view play_list_path);
+    Config(std::string_view usic_library, std::string_view play_list_path, PlayMode mode);
     std::string getUsicLibrary();
     std::string getPlayListPath();
+    PlayMode getPlayMode();
+    void setPlayMode(PlayMode mode);
 
   private:
-    bool repetitive_;
-    bool random_;
     std::string usic_library_;
     std::string play_list_path_;
+    PlayMode mode_;
 };
 
 bool isServerRunning();

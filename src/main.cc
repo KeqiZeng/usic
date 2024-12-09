@@ -44,19 +44,17 @@ bool flagOrTool(int argc, char* argv[])
                 fmt::print(stderr, "not enough arguments\n");
             }
             auto config = std::make_unique<Config>(
-                REPETITIVE,
-                RANDOM,
                 USIC_LIBRARY,
-                PLAY_LISTS_PATH
+                PLAY_LISTS_PATH,
+                DEFAULT_PLAY_MODE
             ); // throw fatal error
             tools::addMusicToList(args[1], config.get());
         }
         else if (utils::commandEq(args[0], FUZZY_PLAY)) {
             auto config = std::make_unique<Config>(
-                REPETITIVE,
-                RANDOM,
                 USIC_LIBRARY,
-                PLAY_LISTS_PATH
+                PLAY_LISTS_PATH,
+                DEFAULT_PLAY_MODE
             ); // throw fatal error
             tools::fuzzyPlay(argv[0], config.get());
         }
@@ -74,7 +72,8 @@ int main(int argc, char* argv[])
         has_server = isServerRunning();
     }
     catch (std::exception& e) {
-        fmt::print("{}\n", e.what());
+        fmt::print(stderr, "{}\n", e.what());
+        return FATAL_ERROR;
     }
 
     if (argc == 1) {

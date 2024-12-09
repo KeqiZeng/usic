@@ -4,14 +4,19 @@
 #include <unordered_map>
 #include <vector>
 
+#include "runtime.h"
+
 /* usic library */
 const std::string_view USIC_LIBRARY    = "/Users/ketch/Music/usic";
 const std::string_view PLAY_LISTS_PATH = "playLists/";
 const std::string_view DEFAULT_PLAY_LIST;
 
 /* playlist */
-const bool REPETITIVE = false;
-const bool RANDOM     = true;
+// const bool RANDOM      = true;
+// const bool SINGLE_LOOP = false;
+
+/* playmode */
+const PlayMode DEFAULT_PLAY_MODE = PlayMode::SHUFFLE;
 
 /* move cursor */
 const int STEP_SECONDS = 10;
@@ -40,8 +45,8 @@ const std::string VOLUME_DOWN       = "volume_down";
 const std::string SET_VOLUME        = "set_volume";
 const std::string GET_VOLUME        = "get_volume";
 const std::string MUTE              = "mute";
-const std::string SET_RANDOM        = "set_random";
-const std::string SET_REPETITIVE    = "set_repetitive";
+const std::string SET_MODE          = "set_mode";
+const std::string GET_MODE          = "get_mode";
 const std::string GET_LIST          = "get_list";
 const std::string QUIT              = "quit";
 const std::string PRINT_VERSION     = "--version";
@@ -58,19 +63,19 @@ const std::unordered_map<std::string, std::vector<std::string>> COMMANDS = {
     {PAUSE, {"ps"}},
     {SEEK_FORWARD, {"sf", "forward"}},
     {SEEK_BACKWARD, {"sb", "backward"}},
-    {SEEK_TO, {"seek", "st"}},
+    {SEEK_TO, {"to", "seek"}},
     {GET_PROGRESS, {"gp", "progress"}},
     {VOLUME_UP, {"vu"}},
     {VOLUME_DOWN, {"vd"}},
     {SET_VOLUME, {"sv", "setv"}},
     {GET_VOLUME, {"gv", "getv"}},
     {MUTE, {"m"}},
-    {SET_RANDOM, {"sr", "random"}},
-    {SET_REPETITIVE, {"sp", "repetitive"}},
+    {SET_MODE, {"sm", "setm"}},
+    {GET_MODE, {"gm", "getm"}},
     {GET_LIST, {"list", "ls"}},
     {QUIT, {"q"}},
     {PRINT_VERSION, {"-v"}},
     {PRINT_HELP, {"-h"}},
     {ADD_MUSIC_TO_LIST, {"aml", "add"}},
-    {FUZZY_PLAY, {"fuzzy", "fp", "f"}},
+    {FUZZY_PLAY, {"fp", "fuzzy"}},
 };
