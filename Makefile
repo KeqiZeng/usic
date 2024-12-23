@@ -6,10 +6,12 @@ PROJECT_NAME = usic
 
 run:
 	@cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+	@cp ./build/compile_commands.json .
 	@cmake --build build && echo "\n[32m========== output ==========[0m\n" && ./build/${PROJECT_NAME}
 
 release:
 	@cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+	@cp ./build/compile_commands.json .
 	@cmake --build build
 
 test:

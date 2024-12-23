@@ -16,26 +16,17 @@ add_executable(${PROJECT_NAME} ${SOURCES})
 
 include(FetchContent)
 
-# ## dependences ###
+## dependences ###
 # miniaudio
 FetchContent_Declare(
   miniaudio
   GIT_REPOSITORY https://github.com/mackron/miniaudio
-  GIT_TAG 0.11.21
+  GIT_TAG 6a8a756b88feccfdf6c73345b44017b0d690d849
 )
 FetchContent_MakeAvailable(miniaudio)
 target_include_directories(${PROJECT_NAME} PRIVATE ${miniaudio_SOURCE_DIR})
 
-# fmt
-FetchContent_Declare(
-  fmt
-  GIT_REPOSITORY https://github.com/fmtlib/fmt
-  GIT_TAG 10.2.1
-)
-FetchContent_MakeAvailable(fmt)
-target_link_libraries(${PROJECT_NAME} fmt::fmt)
-
-# ## test ###
+## test ###
 option(BUILD_TESTING "Build test targets" OFF)
 
 if(BUILD_TESTING)
