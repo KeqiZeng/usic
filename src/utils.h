@@ -1,26 +1,16 @@
 #pragma once
 
-#include <optional>
+#include "miniaudio.h"
 #include <string>
 #include <string_view>
 
-namespace utils
+namespace Utils
 {
 
-void logMsg(
-    std::string_view msg,
-    std::string_view log_file,
-    std::string_view source_file,
-    int line,
-    std::string_view func_name
-);
-const std::string createTmpDefaultList();
-const std::string createTmpBlankFile();
-bool isLineInFile(std::string_view line, std::string_view file_name);
-void removeTmpFiles();
-std::optional<int> timeStrToSec(std::string_view time_str);
-std::optional<std::string> secToTimeStr(int seconds);
-std::optional<std::string> removeExt(const std::string& music_name);
-bool commandEq(const std::string& command, const std::string& target);
+ma_result reinitDecoder(std::string_view filename, ma_decoder_config* config, ma_decoder* decoder) noexcept;
+ma_result seekToStart(ma_decoder* decoder);
+ma_result seekToEnd(ma_decoder* decoder);
+std::string getWAVFileName(std::string_view filename);
+void createFile(std::string_view filename);
 
-} // namespace utils
+} // namespace Utils

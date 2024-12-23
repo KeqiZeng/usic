@@ -1,7 +1,7 @@
 #include "music_list.h"
-#include "fmt/core.h"
-#include "runtime.h"
+#include "log.h"
 
+#include <format>
 #include <fstream>
 #include <memory>
 #include <random>
@@ -33,7 +33,7 @@ void MusicList::load(std::string_view list_file_path)
         file.close();
     }
     else {
-        LOG(fmt::format("Failed to open file: {}", list_file_path), LogType::ERROR);
+        LOG(std::format("Failed to open file: {}", list_file_path), LogType::ERROR);
     }
     current_      = head_;
     next_to_play_ = current_;

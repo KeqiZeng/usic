@@ -1,199 +1,73 @@
 #include "utils.h"
-#include "config.h"
-#include "fmt/chrono.h"
-#include "fmt/core.h"
-#include "fmt/os.h"
-#include "runtime.h"
-#include <algorithm>
-#include <cctype>
-#include <chrono>
+#include "log.h"
+#include "miniaudio.h"
 #include <filesystem>
 #include <fstream>
-#include <optional>
-#include <random>
+#include <iostream>
 #include <string>
 #include <string_view>
 
-namespace utils
+namespace Utils
 {
 
-void logMsg(
-    std::string_view msg,
-    std::string_view log_file,
-    std::string_view source_file,
-    int line,
-    std::string_view func_name
-)
+ma_result reinitDecoder(std::string_view filename, ma_decoder_config* config, ma_decoder* decoder) noexcept
 {
-    const auto NOW        = std::chrono::system_clock::now();
-    const auto NOW_TIME_T = std::chrono::system_clock::to_time_t(NOW);
-    const auto LOCAL_TIME = *std::localtime(&NOW_TIME_T);
-
-    const auto MESSAGE = fmt::format(
-        "[{:%Y-%m-%d %H:%M:%S} {}:{}:{}] {}\n",
-        LOCAL_TIME,
-        std::filesystem::path{source_file}.filename().string(),
-        line,
-        func_name,
-        msg
-    );
-
-    auto out_file = fmt::output_file(log_file.data(), fmt::file::RDWR | fmt::file::CREATE | fmt::file::APPEND);
-    out_file.print("{}", MESSAGE);
-    out_file.close();
+    ma_result result = ma_decoder_uninit(decoder);
+    result           = ma_decoder_init_file(filename.data(), config, decoder);
+    return result;
 }
 
-static const std::string generateRandomString(size_t length)
+ma_result seekToStart(ma_decoder* decoder)
 {
-    static const std::string CHARS = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    static std::uniform_int_distribution<> dis(0, CHARS.size() - 1);
+    return ma_decoder_seek_to_pcm_frame(decoder, 0);
+}
 
-    std::string result;
-    result.reserve(length);
-    for (size_t i = 0; i < length; ++i) {
-        result += CHARS[dis(gen)];
+ma_result seekToEnd(ma_decoder* decoder)
+{
+    ma_uint64 length = 0;
+    ma_result result = ma_decoder_get_length_in_pcm_frames(decoder, &length);
+    if (result != MA_SUCCESS) {
+        LOG("failed to get length in PCM frames", LogType::ERROR, result);
+        return result;
+    }
+    result = ma_decoder_seek_to_pcm_frame(decoder, length);
+    if (result != MA_SUCCESS) {
+        LOG("failed to seek to PCM frame with length", LogType::ERROR, result);
+        return result;
     }
     return result;
 }
 
-const std::string createTmpBlankFile()
+std::string getWAVFileName(std::string_view filename)
 {
-    std::string random_name = "usic_" + generateRandomString(10) + ".txt";
-    std::string temp_file   = std::filesystem::temp_directory_path() / random_name;
-    std::ofstream outfile(temp_file);
-    if (!outfile.is_open()) {
-        LOG(fmt::format("Failed to open temporary file: {}", temp_file), LogType::ERROR);
-        throw std::runtime_error(fmt::format("Failed to create temporary file: {}", temp_file));
+    // create a file in temp directory with same name but .wav extension
+    std::filesystem::path file_path(filename);
+    std::string base_name          = file_path.stem().string();
+    std::string temp_dir           = std::filesystem::temp_directory_path().string();
+    std::filesystem::path wav_path = std::filesystem::path(temp_dir) / "usic";
+
+    // create the usic directory in temp if it doesn't exist
+    if (!std::filesystem::exists(wav_path)) {
+        std::filesystem::create_directories(wav_path);
     }
-    outfile.close();
-    if (outfile.fail()) {
-        LOG(fmt::format("Failed to close temporary file: {}", temp_file), LogType::ERROR);
-        throw std::runtime_error(fmt::format("Failed to close temporary file: {}", temp_file));
-    }
-    return temp_file;
+
+    return (wav_path / (base_name + ".wav")).string();
 }
 
-const std::string createTmpDefaultList()
+void createFile(std::string_view filename)
 {
-    std::string random_name = "usic_" + generateRandomString(10) + ".txt";
-    std::string temp_file   = std::filesystem::temp_directory_path() / random_name;
-
-    std::ofstream outfile(temp_file);
-    if (!outfile.is_open()) {
-        LOG(fmt::format("Failed to open temporary file: {}", temp_file), LogType::ERROR);
-        throw std::runtime_error(fmt::format("Failed to create temporary file: {}", temp_file));
+    // Create parent directory if it doesn't exist
+    std::filesystem::path file_path(filename);
+    if (!std::filesystem::exists(file_path.parent_path())) {
+        std::filesystem::create_directories(file_path.parent_path());
     }
 
-    for (const auto& entry : std::filesystem::recursive_directory_iterator(USIC_LIBRARY)) {
-        if (!entry.is_regular_file())
-            continue;
-
-        std::string ext = entry.path().extension().string();
-        std::ranges::transform(ext, ext.begin(), ::tolower);
-
-        if (ext == ".mp3" || ext == ".flac" || ext == ".wav") {
-            outfile << entry.path().filename().string() << '\n';
-            if (outfile.fail()) {
-                LOG(fmt::format("Failed to write to temporary file: {}", temp_file), LogType::ERROR);
-                throw std::runtime_error(fmt::format("Failed to write to temporary file: {}", temp_file));
-            }
-        }
+    // Create file if it doesn't exist
+    std::ofstream out_file(filename.data(), std::ios::app);
+    if (!out_file) {
+        throw std::ios_base::failure("failed to create file");
     }
-
-    outfile.close();
-    if (outfile.fail()) {
-        LOG(fmt::format("Failed to close temporary file: {}", temp_file), LogType::ERROR);
-        throw std::runtime_error(fmt::format("Failed to close temporary file: {}", temp_file));
-    }
-
-    return temp_file;
+    out_file.close();
 }
 
-bool isLineInFile(std::string_view line, std::string_view file_name)
-{
-    std::ifstream file(file_name.data());
-    if (file.is_open()) {
-        std::string buffer;
-        while (std::getline(file, buffer)) {
-            if (buffer == line) {
-                file.close();
-                return true;
-            }
-        }
-        file.close();
-    }
-    return false;
-}
-
-void removeTmpFiles()
-{
-    const auto TMP_DIR = std::filesystem::temp_directory_path();
-    for (const auto& entry : std::filesystem::directory_iterator(TMP_DIR)) {
-        if (!entry.is_regular_file())
-            continue;
-
-        const std::string FILENAME = entry.path().filename().string();
-        if (FILENAME.starts_with("usic_") && FILENAME.ends_with(".txt")) {
-            std::error_code ec;
-            std::filesystem::remove(entry.path(), ec);
-            if (ec) {
-                LOG(fmt::format("Failed to delete temporary file {}: {}", entry.path().string(), ec.message()),
-                    LogType::ERROR);
-            }
-        }
-    }
-}
-
-std::optional<int> timeStrToSec(std::string_view time_str)
-{
-    int min = 0;
-    int sec = 0;
-
-    std::istringstream iss(time_str.data());
-    char colon;
-    if (!(iss >> min >> colon >> sec) || colon != ':') {
-        return std::nullopt; // failed conversion
-    }
-
-    // minutes should not be less than 0
-    if (min < 0) {
-        return std::nullopt;
-    }
-
-    // seconds should be 0-60
-    if (sec < 0 || sec > 60) {
-        return -1;
-    }
-
-    return min * 60 + sec;
-}
-
-std::optional<std::string> secToTimeStr(int seconds)
-{
-    if (seconds < 0) {
-        return std::nullopt;
-    }
-
-    int min = seconds / 60;
-    int sec = seconds % 60;
-
-    return fmt::format("{:d}:{:02d}", min, sec);
-}
-
-std::optional<std::string> removeExt(const std::string& music_name)
-{
-    std::filesystem::path path(music_name);
-    if (path.empty() || !path.has_filename() || !path.has_extension()) {
-        return std::nullopt;
-    }
-    return path.stem().string();
-}
-
-bool commandEq(const std::string& command, const std::string& target)
-{
-    return (command == target || std::ranges::find(COMMANDS.at(target), command) != COMMANDS.at(target).end());
-}
-
-} // namespace utils
+} // namespace Utils

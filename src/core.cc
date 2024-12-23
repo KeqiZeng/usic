@@ -1,392 +1,307 @@
 #include "core.h"
-#include "fmt/core.h"
-#include "music_list.h"
-#include "runtime.h"
+#include "log.h"
+#include "miniaudio.h"
 #include "utils.h"
+
 #include <atomic>
-#include <cstdlib>
-#include <memory>
-#include <mutex>
+#include <cstring>
+#include <filesystem>
+#include <format>
 #include <string>
 #include <string_view>
 #include <thread>
 
-EnginePack::EnginePack()
-    : engine_(new ma_engine)
+/// dataCallback for ma_device
+// DO NOT LOG IN THIS FUNCTION
+void dataCallback(ma_device* device, void* output, const void* input, ma_uint32 frame_count)
 {
-    ma_result result = ma_engine_init(nullptr, engine_);
-    if (result != MA_SUCCESS) {
-        LOG("failed to initialize engine", LogType::ERROR);
-        throw std::runtime_error("failed to initialize engine");
-    }
-    ma_device* device = ma_engine_get_device(engine_);
-    result            = ma_device_get_master_volume(device, &volume_);
-    if (result != MA_SUCCESS) {
-        LOG("failed to get master volume", LogType::ERROR);
-    }
-    LOG("initialized engine", LogType::INFO);
-}
-
-EnginePack::~EnginePack()
-{
-    ma_engine_uninit(engine_);
-    delete engine_;
-    LOG("uninitialized engine", LogType::INFO);
-}
-
-float EnginePack::getVolume()
-{
-    return volume_;
-}
-
-ma_result EnginePack::setVolume(float volume)
-{
-    last_volume_      = volume_;
-    ma_device* device = ma_engine_get_device(engine_);
-    ma_result result  = ma_device_set_master_volume(device, volume);
-    if (result != MA_SUCCESS) {
-        LOG("failed to set master volume", LogType::ERROR);
-        return result;
-    }
-    volume_ = volume;
-    return MA_SUCCESS;
-}
-
-float EnginePack::getLastVolume()
-{
-    return last_volume_;
-}
-
-SoundPack::SoundPack()
-    : sound_init_notification_(std::make_unique<SoundInitNotification>())
-{
-    sound_init_notification_->cb_.onSignal = soundInitNotificationCallback;
-    sound_init_notification_->data_        = this;
-}
-SoundPack::~SoundPack()
-{
-    this->uninit();
-}
-
-ma_result SoundPack::init(ma_engine* engine, std::string_view file_path, ma_uint32 flags)
-{
-    std::lock_guard<std::mutex> lock(mtx_);
-    if (initialized_.load(std::memory_order_acquire)) {
-        LOG("cannot initialize twice", LogType::ERROR);
-        return MA_ERROR;
-    }
-
-    sound_                                      = std::make_unique<ma_sound>();
-    ma_sound_config config                      = ma_sound_config_init_2(engine);
-    config.pFilePath                            = file_path.data();
-    config.flags                                = flags;
-    config.initNotifications.done.pNotification = sound_init_notification_.get();
-
-    ma_result result = ma_sound_init_ex(engine, &config, sound_.get());
-    if (result != MA_SUCCESS) {
-        LOG("failed to initialize sound", LogType::ERROR);
-        sound_.reset();
-        initialized_.store(false, std::memory_order_release);
-        return result;
-    }
-
-    return MA_SUCCESS;
-}
-
-void SoundPack::uninit()
-{
-    std::lock_guard<std::mutex> lock(mtx_);
-
-    if (!initialized_.load(std::memory_order_acquire)) {
+    auto* context = static_cast<Context*>(device->pUserData);
+    if (!context) {
         return;
     }
 
-    if (!sound_) {
+    ma_uint32 frame_size = ma_get_bytes_per_frame(device->playback.format, device->playback.channels);
+    if (context->is_audio_finished->load()) {
+        // clear output buffer
+        std::memset(output, 0, frame_count * frame_size);
+    }
+
+    ma_decoder* current_decoder = *context->is_decoder1_used ? context->decoder1 : context->decoder2;
+    if (!current_decoder) {
         return;
     }
 
-    ma_result result = ma_sound_stop(sound_.get());
+    ma_uint64 frames_read = 0;
+    ma_result result      = ma_decoder_read_pcm_frames(current_decoder, output, frame_count, &frames_read);
     if (result != MA_SUCCESS) {
-        LOG("failed to stop sound", LogType::ERROR);
+        return;
     }
 
-    ma_sound_uninit(sound_.get());
-
-    initialized_.store(false, std::memory_order_release);
-    playing_.store(false, std::memory_order_release);
-
-    sound_.reset();
-    LOG("uninitialized sound", LogType::INFO);
-}
-
-bool SoundPack::isInitialized()
-{
-    return initialized_.load(std::memory_order_acquire);
-}
-bool SoundPack::isPlaying()
-{
-    return playing_.load(std::memory_order_acquire);
-}
-
-MaComponents::MaComponents()
-    : engine_pack_(std::make_unique<EnginePack>())
-    , sound_to_play_(std::make_unique<SoundPack>())
-    , sound_to_register_(std::make_unique<SoundPack>())
-{
-}
-
-MaComponents::~MaComponents()
-{
-    engine_pack_.reset();
-    sound_to_play_.reset();
-    sound_to_register_.reset();
-}
-
-ma_sound* MaComponents::getPlayingSound()
-{
-    ma_sound* sound = nullptr;
-    if (sound_to_play_->isPlaying() && !sound_to_register_->isPlaying()) {
-        sound = sound_to_play_->sound_.get();
-    }
-    else if (!sound_to_play_->isPlaying() && sound_to_register_->isPlaying()) {
-        sound = sound_to_register_->sound_.get();
-    }
-    return sound;
-}
-
-ma_result MaComponents::moveCursorToEnd()
-{
-    ma_sound* sound = this->getPlayingSound();
-    if (sound == nullptr) {
-        LOG("failed to get playing sound", LogType::ERROR);
-        return MA_ERROR;
+    // if the read frame count is less than the requested frame count, fill the rest of the buffer with zeros
+    if (frames_read < frame_count) {
+        std::memset((ma_uint8*)output + frames_read * frame_size, 0, (frame_count - frames_read) * frame_size);
     }
 
-    ma_uint64 length = 0;
-    ma_result result = ma_sound_get_length_in_pcm_frames(sound, &length);
+    if (frames_read == 0) {
+        context->is_audio_finished->store(true);
+    }
+}
+
+CoreComponents& CoreComponents::get() noexcept
+{
+    return g_core;
+}
+
+ma_result CoreComponents::play(std::string_view filename)
+{
+    if (!std::filesystem::exists(filename)) {
+        LOG(std::format("audio file does not exist: {}", filename), LogType::ERROR);
+        return MA_INVALID_DATA;
+    }
+
+    std::string wav_filename = Utils::getWAVFileName(filename);
+    Utils::createFile(wav_filename);
+
+    // Decoding in background, so that it doesn't block the main thread.
+    // sound can be played even if decoding is still in progress
+    std::thread decode_thread([this, filename, wav_filename]() {
+        ma_result decode_result = decodeToWAV(filename, wav_filename);
+        if (decode_result != MA_SUCCESS) {
+            LOG("background decoding failed", LogType::ERROR, decode_result);
+        }
+        LOG("background decoding finished", LogType::INFO);
+    });
+    decode_thread.detach();
+
+    ma_result result = reinitUnusedDecoder(wav_filename);
     if (result != MA_SUCCESS) {
-        LOG("failed to get length in pcm frames", LogType::ERROR);
+        LOG("failed to reinit unused decoder", LogType::ERROR, result);
         return result;
     }
-    result = ma_sound_seek_to_pcm_frame(sound, length);
-    if (result != MA_SUCCESS) {
-        LOG("failed to seek to pcm frame", LogType::ERROR);
-        return result;
-    }
-    if (ma_sound_is_playing(sound) == 0U) {
-        result = ma_sound_start(sound);
+
+    switchDecoder();
+    current_playing_audio_ = filename;
+    return result;
+}
+
+ma_result CoreComponents::pauseOrResume()
+{
+    ma_result result = MA_SUCCESS;
+    if (is_audio_paused_->load()) {
+        result = ma_device_start(device_);
         if (result != MA_SUCCESS) {
-            LOG("failed to start sound", LogType::ERROR);
+            LOG("failed to start device", LogType::ERROR, result);
             return result;
         }
     }
-    return MA_SUCCESS;
-}
-
-UserData::UserData(
-    EnginePack* engine_pack,
-    SoundPack* sound_to_play,
-    SoundPack* sound_to_register,
-    Controller* controller,
-    MusicList* music_list,
-    std::string* music_playing,
-    Config* config
-)
-    : engine_pack_(engine_pack)
-    , sound_to_play_(sound_to_play)
-    , sound_to_register_(sound_to_register)
-    , controller_(controller)
-    , music_list_(music_list)
-    , music_playing_(music_playing)
-    , config_(config)
-{
-}
-
-void Controller::signalEnd()
-{
-    end_.store(true, std::memory_order_release);
-    flag_.test_and_set(std::memory_order_release);
-    flag_.notify_one();
-}
-
-void Controller::signalError()
-{
-    error_.store(true, std::memory_order_release);
-    flag_.test_and_set(std::memory_order_release);
-    flag_.notify_one();
-}
-
-void Controller::quit()
-{
-    quit_flag_.store(true, std::memory_order_release);
-    flag_.test_and_set(std::memory_order_release);
-    flag_.notify_one();
-}
-
-bool Controller::atEnd()
-{
-    return end_.load(std::memory_order_acquire);
-}
-
-bool Controller::getError()
-{
-    return error_.load(std::memory_order_acquire);
-}
-
-bool Controller::getQuitFlag()
-{
-    return quit_flag_.load(std::memory_order_acquire);
-}
-
-void Controller::waitForCleanerExit()
-{
-    while (!cleaner_exited_.load(std::memory_order_acquire)) {
-        std::this_thread::yield();
-    }
-}
-
-ma_result playInternal(
-    EnginePack* engine_pack,
-    SoundPack* sound_to_play,
-    std::string_view music_to_play,
-    std::string* music_playing,
-    MusicList* music_list,
-    SoundPack* sound_to_register,
-    Controller* controller,
-    Config* config
-)
-{
-    *music_playing = music_to_play;
-
-    sound_to_register->playing_.store(false, std::memory_order_release);
-
-    ma_result result = sound_to_play->init(
-        engine_pack->engine_,
-        fmt::format("{}{}", config->getUsicLibrary(), music_to_play),
-        LOADING_FLAGS
-    );
-    if (result != MA_SUCCESS) {
-        LOG(fmt::format("failed to initialize sound from file: {}", music_to_play), LogType::ERROR);
-        return result;
-    }
-
-    // update the music playing
-    if (!music_list->moveTo(music_to_play)) {
-        LOG(fmt::format("failed to set playing music: {}", music_to_play), LogType::ERROR);
-    }
-    music_list->updateCurrent();
-
-    switch (config->getPlayMode()) {
-    case PlayMode::NORMAL:
-        music_list->forward();
-        break;
-    case PlayMode::SHUFFLE:
-        music_list->shuffle();
-        break;
-    case PlayMode::SINGLE:
-        music_list->single();
-        break;
-    default:
-        LOG("invalid play mode", LogType::ERROR);
-        throw std::runtime_error("invalid play mode");
-    }
-
-    auto* user_data(
-        new UserData(engine_pack, sound_to_register, sound_to_play, controller, music_list, music_playing, config)
-    );
-
-    ma_sound_set_end_callback(sound_to_play->sound_.get(), soundAtEndCallback, user_data);
-    result = ma_sound_start(sound_to_play->sound_.get());
-    if (result != MA_SUCCESS) {
-        LOG(fmt::format("failed to start sound: {}", music_to_play), LogType::ERROR);
-        return result;
-    }
-    sound_to_play->playing_.store(true, std::memory_order_release);
-    LOG(fmt::format("started playing: {}", music_to_play), LogType::INFO);
-    return MA_SUCCESS;
-}
-
-void cleanFunc(MaComponents* ma_comp, Controller* controller)
-{
-    while (true) {
-        controller->flag_.wait(false, std::memory_order_acquire);
-        controller->flag_.clear(std::memory_order_release);
-
-        if (controller->getQuitFlag()) {
-            ma_comp->sound_to_play_->uninit();
-            LOG("uninitialized sound_to_play", LogType::INFO);
-
-            ma_comp->sound_to_register_->uninit();
-            LOG("uninitialized sound_to_register", LogType::INFO);
-
-            utils::removeTmpFiles();
-            LOG("removed tmp files", LogType::INFO);
-
-            controller->cleaner_exited_.store(true, std::memory_order_release);
-            LOG("cleaner exited", LogType::INFO);
-            return;
-        }
-        if (controller->atEnd()) {
-            if (!ma_comp->sound_to_play_->isPlaying() && ma_comp->sound_to_play_->isInitialized()) {
-                ma_comp->sound_to_play_->uninit();
-            }
-            if (!ma_comp->sound_to_register_->isPlaying() && ma_comp->sound_to_register_->isInitialized()) {
-                ma_comp->sound_to_register_->uninit();
-            }
-            controller->end_.store(false, std::memory_order_release);
-        }
-        if (controller->getError()) {
-            ma_comp->sound_to_play_->uninit();
-            ma_comp->sound_to_register_->uninit();
-            controller->error_.store(false, std::memory_order_release);
+    else {
+        result = ma_device_stop(device_);
+        if (result != MA_SUCCESS) {
+            LOG("failed to stop device", LogType::ERROR, result);
+            return result;
         }
     }
+    is_audio_paused_->store(!is_audio_paused_->load());
+    return result;
 }
 
-void soundAtEndCallback(void* user_data, ma_sound* sound)
+ma_result CoreComponents::moveCursorToStart()
 {
-    auto* data = static_cast<UserData*>(user_data);
-    if (!data) {
-        LOG("got an invalid user_data", LogType::ERROR);
-        throw std::runtime_error("got an invalid user_data");
-    }
-    const std::optional<std::string>& music_to_play = data->music_list_->getMusic();
-    if (!music_to_play.has_value()) {
-        LOG("failed to get music", LogType::ERROR);
-        data->controller_->signalError();
-        delete data;
-        return;
-    }
-
-    ma_result result = playInternal(
-        data->engine_pack_,
-        data->sound_to_play_,
-        music_to_play.value(),
-        data->music_playing_,
-        data->music_list_,
-        data->sound_to_register_,
-        data->controller_,
-        data->config_
-    );
-    if (result != MA_SUCCESS) {
-        LOG(fmt::format("failed to play music: {}", music_to_play.value()), LogType::ERROR);
-        data->controller_->signalError();
+    ma_result result = MA_SUCCESS;
+    if (*is_decoder1_used_) {
+        result = Utils::seekToStart(decoder1_);
+        if (result != MA_SUCCESS) {
+            LOG("failed to seek to start for decoder1", LogType::ERROR, result);
+            return result;
+        }
     }
     else {
-        data->controller_->signalEnd();
+        result = Utils::seekToStart(decoder2_);
+        if (result != MA_SUCCESS) {
+            LOG("failed to seek to start for decoder2", LogType::ERROR, result);
+            return result;
+        }
     }
-    delete data;
+    return result;
 }
 
-void soundInitNotificationCallback(ma_async_notification* notification)
+ma_result CoreComponents::moveCursorToEnd()
 {
-    auto* sound_init_notification = static_cast<SoundInitNotification*>(notification);
-    auto* data                    = static_cast<SoundPack*>(sound_init_notification->data_);
-    if (!data) {
-        LOG("got an invalid data", LogType::ERROR);
-        throw std::runtime_error("got an invalid data");
+    ma_result result = MA_SUCCESS;
+    if (*is_decoder1_used_) {
+        result = Utils::seekToEnd(decoder1_);
+        if (result != MA_SUCCESS) {
+            LOG("failed to seek to end for decoder1", LogType::ERROR, result);
+            return result;
+        }
+    }
+    else {
+        result = Utils::seekToEnd(decoder2_);
+        if (result != MA_SUCCESS) {
+            LOG("failed to seek to end for decoder2", LogType::ERROR, result);
+            return result;
+        }
+    }
+    return result;
+}
+
+void CoreComponents::clearWAVFile()
+{
+    if (is_audio_finished_->load()) {
+        std::string wav_filename = Utils::getWAVFileName(current_playing_audio_);
+        std::filesystem::remove(wav_filename);
+    }
+}
+
+CoreComponents::CoreComponents()
+    : device_(new ma_device)
+    , decoder1_(new ma_decoder)
+    , decoder2_(new ma_decoder)
+    , encoder_(new ma_encoder)
+    , is_decoder1_used_(new bool{false})
+    , is_audio_finished_(new std::atomic<bool>{true})
+    , is_audio_paused_(new std::atomic<bool>{false})
+{
+    ma_device_config device_config  = ma_device_config_init(ma_device_type_playback);
+    device_config.playback.format   = format_;
+    device_config.playback.channels = channels_;
+    device_config.sampleRate        = sample_rate_;
+    device_config.dataCallback      = dataCallback;
+
+    static Context context{
+        .decoder1          = decoder1_,
+        .decoder2          = decoder2_,
+        .is_decoder1_used  = is_decoder1_used_,
+        .is_audio_finished = is_audio_finished_,
+    };
+    device_config.pUserData = &context;
+
+    ma_result result = ma_device_init(nullptr, &device_config, device_);
+    if (result != MA_SUCCESS) {
+        LOG("failed to initialize device", LogType::ERROR, result);
+        deletePtr();
+        std::exit(1);
     }
 
-    data->initialized_.store(true, std::memory_order_release);
-    LOG("initialized sound", LogType::INFO);
+    result = ma_device_start(device_);
+    if (result != MA_SUCCESS) {
+        LOG("failed to start device", LogType::ERROR, result);
+        ma_device_uninit(device_);
+        deletePtr();
+        std::exit(1);
+    }
+
+    decoder_config_ = ma_decoder_config_init(format_, channels_, sample_rate_);
+    encoder_config_ = ma_encoder_config_init(ma_encoding_format_wav, format_, channels_, sample_rate_);
 }
+
+CoreComponents::~CoreComponents()
+{
+    ma_device_uninit(device_);
+    ma_decoder_uninit(decoder1_);
+    ma_decoder_uninit(decoder2_);
+    deletePtr();
+}
+
+void CoreComponents::switchDecoder() noexcept
+{
+    *is_decoder1_used_ = !*is_decoder1_used_;
+    is_audio_finished_->store(false);
+}
+
+ma_result CoreComponents::decodeToWAV(std::string_view input_file, std::string_view output_file)
+{
+    ma_decoder decoder;
+    ma_result result = ma_decoder_init_file(input_file.data(), &decoder_config_, &decoder);
+    if (result != MA_SUCCESS) {
+        LOG(std::format("failed to initialize decoder for file: {}", input_file), LogType::ERROR, result);
+        return result;
+    }
+
+    ma_uint64 pcm_frame_count = 0;
+    result                    = ma_decoder_get_length_in_pcm_frames(&decoder, &pcm_frame_count);
+    if (result != MA_SUCCESS) {
+        LOG("failed to get length in PCM frames", LogType::ERROR, result);
+        ma_decoder_uninit(&decoder);
+        return result;
+    }
+
+    result = ma_encoder_init_file(output_file.data(), &encoder_config_, encoder_);
+    if (result != MA_SUCCESS) {
+        LOG(std::format("failed to initialize encoder for file: {}", output_file), LogType::ERROR, result);
+        ma_decoder_uninit(&decoder);
+        return result;
+    }
+
+    const size_t FRAME_COUNT = 4096;
+
+    ma_uint32 frame_size = ma_get_bytes_per_frame(decoder.outputFormat, decoder.outputChannels);
+    void* pcm_frames     = malloc(frame_size * FRAME_COUNT);
+    if (pcm_frames == nullptr) {
+        LOG("failed to allocate memory", LogType::ERROR);
+        ma_decoder_uninit(&decoder);
+        ma_encoder_uninit(encoder_);
+        return MA_OUT_OF_MEMORY;
+    }
+
+    ma_uint64 frames_read    = 0;
+    ma_uint64 frames_written = 0;
+    while (true) {
+        ma_decoder_read_pcm_frames(&decoder, pcm_frames, FRAME_COUNT, &frames_read);
+        if (frames_read == 0)
+            break;
+
+        ma_encoder_write_pcm_frames(encoder_, pcm_frames, frames_read, &frames_written);
+    }
+
+    free(pcm_frames);
+    ma_encoder_uninit(encoder_);
+    ma_decoder_uninit(&decoder);
+
+    return result;
+}
+
+ma_result CoreComponents::reinitUnusedDecoder(std::string_view filename)
+{
+    ma_result result = MA_SUCCESS;
+    if (*is_decoder1_used_) {
+        result = Utils::reinitDecoder(filename, &decoder_config_, decoder2_);
+        if (result != MA_SUCCESS) {
+            LOG("failed to reinitialize decoder2", LogType::ERROR, result);
+            return result;
+        }
+
+        result = Utils::seekToStart(decoder2_);
+        if (result != MA_SUCCESS) {
+            LOG("failed to seek to start for decoder2", LogType::ERROR, result);
+            return result;
+        }
+    }
+    else {
+        result = Utils::reinitDecoder(filename, &decoder_config_, decoder1_);
+        if (result != MA_SUCCESS) {
+            LOG("failed to reinitialize decoder1", LogType::ERROR, result);
+            return result;
+        }
+
+        result = Utils::seekToStart(decoder1_);
+        if (result != MA_SUCCESS) {
+            LOG("failed to seek to start for decoder1", LogType::ERROR, result);
+            return result;
+        }
+    }
+    return result;
+};
+
+void CoreComponents::deletePtr()
+{
+    delete device_;
+    delete decoder1_;
+    delete decoder2_;
+    delete encoder_;
+    delete is_decoder1_used_;
+    delete is_audio_finished_;
+    delete is_audio_paused_;
+}
+
+CoreComponents CoreComponents::g_core;
