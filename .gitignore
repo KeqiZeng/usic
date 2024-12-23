@@ -1,5 +1,6 @@
-build/*
-.cache/*
-.vscode/*
+build/
+music/
+.cache/
+.vscode/
 .DS_Store
 compile_commands.json
