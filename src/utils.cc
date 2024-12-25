@@ -10,14 +10,23 @@
 namespace Utils
 {
 
-ma_result reinitDecoder(std::string_view filename, ma_decoder_config* config, ma_decoder* decoder) noexcept
+ma_result reinitDecoder(std::string_view filename, ma_decoder_config* config, ma_decoder* decoder)
 {
     ma_result result = ma_decoder_uninit(decoder);
-    result           = ma_decoder_init_file(filename.data(), config, decoder);
+    if (result != MA_SUCCESS) {
+        LOG("failed to uninitialize decoder", LogType::ERROR, result);
+        return result;
+    }
+
+    result = ma_decoder_init_file(filename.data(), config, decoder);
+    if (result != MA_SUCCESS) {
+        LOG(std::format("failed to initialize decoder for file {}", filename), LogType::ERROR, result);
+        return result;
+    }
     return result;
 }
 
-ma_result seekToStart(ma_decoder* decoder)
+ma_result seekToStart(ma_decoder* decoder) noexcept
 {
     return ma_decoder_seek_to_pcm_frame(decoder, 0);
 }
@@ -30,12 +39,7 @@ ma_result seekToEnd(ma_decoder* decoder)
         LOG("failed to get length in PCM frames", LogType::ERROR, result);
         return result;
     }
-    result = ma_decoder_seek_to_pcm_frame(decoder, length);
-    if (result != MA_SUCCESS) {
-        LOG("failed to seek to PCM frame with length", LogType::ERROR, result);
-        return result;
-    }
-    return result;
+    return ma_decoder_seek_to_pcm_frame(decoder, length);
 }
 
 std::string getWAVFileName(std::string_view filename)

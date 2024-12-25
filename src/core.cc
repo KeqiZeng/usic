@@ -1,6 +1,7 @@
 #include "core.h"
 #include "log.h"
 #include "miniaudio.h"
+#include "thread_signals.h"
 #include "utils.h"
 
 #include <atomic>
@@ -11,7 +12,7 @@
 #include <string_view>
 #include <thread>
 
-/// dataCallback for ma_device
+// dataCallback for ma_device
 // DO NOT LOG IN THIS FUNCTION
 void dataCallback(ma_device* device, void* output, const void* input, ma_uint32 frame_count)
 {
@@ -21,9 +22,10 @@ void dataCallback(ma_device* device, void* output, const void* input, ma_uint32 
     }
 
     ma_uint32 frame_size = ma_get_bytes_per_frame(device->playback.format, device->playback.channels);
-    if (context->is_audio_finished->load()) {
+    if (context->is_audio_finished->load() || context->is_audio_paused->load()) {
         // clear output buffer
         std::memset(output, 0, frame_count * frame_size);
+        return;
     }
 
     ma_decoder* current_decoder = *context->is_decoder1_used ? context->decoder1 : context->decoder2;
@@ -33,47 +35,70 @@ void dataCallback(ma_device* device, void* output, const void* input, ma_uint32 
 
     ma_uint64 frames_read = 0;
     ma_result result      = ma_decoder_read_pcm_frames(current_decoder, output, frame_count, &frames_read);
-    if (result != MA_SUCCESS) {
+    if (result != MA_SUCCESS && result != MA_AT_END) {
         return;
+    }
+
+    if (result == MA_AT_END) {
+        context->is_audio_finished->store(true);
+        AudioFinishedCallbackSignals::getInstance().signal();
     }
 
     // if the read frame count is less than the requested frame count, fill the rest of the buffer with zeros
     if (frames_read < frame_count) {
         std::memset((ma_uint8*)output + frames_read * frame_size, 0, (frame_count - frames_read) * frame_size);
     }
-
-    if (frames_read == 0) {
-        context->is_audio_finished->store(true);
-    }
 }
 
-CoreComponents& CoreComponents::get() noexcept
+void audioFinishedCallback()
 {
-    return g_core;
+    while (true) {
+        auto& signals = AudioFinishedCallbackSignals::getInstance();
+        signals.wait(false);
+        if (signals.shouldQuit()) {
+            break;
+        }
+        if (signals.isAudioFinished()) {
+            auto& core = CoreComponents::getInstance();
+
+            // TODO: get the next music from music_list and play
+            if (core.getCurrentPlayingAudio() == "./music/李宗盛 - 山丘.wav") {
+                core.play("./music/王力宏 - 需要人陪.flac");
+            }
+            else {
+                core.play("./music/李宗盛 - 山丘.wav");
+            }
+            signals.reset();
+        }
+    }
 }
 
 ma_result CoreComponents::play(std::string_view filename)
 {
+    static std::once_flag once_flag;
+    std::call_once(once_flag, []() {
+        std::thread audio_finished_thread(audioFinishedCallback);
+        audio_finished_thread.detach();
+    });
+
     if (!std::filesystem::exists(filename)) {
         LOG(std::format("audio file does not exist: {}", filename), LogType::ERROR);
         return MA_INVALID_DATA;
     }
 
+    ma_result result         = MA_SUCCESS;
     std::string wav_filename = Utils::getWAVFileName(filename);
-    Utils::createFile(wav_filename);
-
-    // Decoding in background, so that it doesn't block the main thread.
-    // sound can be played even if decoding is still in progress
-    std::thread decode_thread([this, filename, wav_filename]() {
-        ma_result decode_result = decodeToWAV(filename, wav_filename);
-        if (decode_result != MA_SUCCESS) {
-            LOG("background decoding failed", LogType::ERROR, decode_result);
+    if (!std::filesystem::exists(wav_filename)) {
+        Utils::createFile(wav_filename);
+        result = decodeToWAV(filename, wav_filename);
+        if (result != MA_SUCCESS) {
+            LOG("failed to decode to WAV", LogType::ERROR, result);
+            std::filesystem::remove(wav_filename);
+            return result;
         }
-        LOG("background decoding finished", LogType::INFO);
-    });
-    decode_thread.detach();
+    }
 
-    ma_result result = reinitUnusedDecoder(wav_filename);
+    result = reinitUnusedDecoder(wav_filename);
     if (result != MA_SUCCESS) {
         LOG("failed to reinit unused decoder", LogType::ERROR, result);
         return result;
@@ -81,34 +106,14 @@ ma_result CoreComponents::play(std::string_view filename)
 
     switchDecoder();
     current_playing_audio_ = filename;
-    return result;
-}
-
-ma_result CoreComponents::pauseOrResume()
-{
-    ma_result result = MA_SUCCESS;
-    if (is_audio_paused_->load()) {
-        result = ma_device_start(device_);
-        if (result != MA_SUCCESS) {
-            LOG("failed to start device", LogType::ERROR, result);
-            return result;
-        }
-    }
-    else {
-        result = ma_device_stop(device_);
-        if (result != MA_SUCCESS) {
-            LOG("failed to stop device", LogType::ERROR, result);
-            return result;
-        }
-    }
-    is_audio_paused_->store(!is_audio_paused_->load());
+    audio_finished_->store(false);
     return result;
 }
 
 ma_result CoreComponents::moveCursorToStart()
 {
     ma_result result = MA_SUCCESS;
-    if (*is_decoder1_used_) {
+    if (*decoder1_used_) {
         result = Utils::seekToStart(decoder1_);
         if (result != MA_SUCCESS) {
             LOG("failed to seek to start for decoder1", LogType::ERROR, result);
@@ -128,7 +133,7 @@ ma_result CoreComponents::moveCursorToStart()
 ma_result CoreComponents::moveCursorToEnd()
 {
     ma_result result = MA_SUCCESS;
-    if (*is_decoder1_used_) {
+    if (*decoder1_used_) {
         result = Utils::seekToEnd(decoder1_);
         if (result != MA_SUCCESS) {
             LOG("failed to seek to end for decoder1", LogType::ERROR, result);
@@ -145,9 +150,19 @@ ma_result CoreComponents::moveCursorToEnd()
     return result;
 }
 
+std::string CoreComponents::getCurrentPlayingAudio() const noexcept
+{
+    return current_playing_audio_;
+}
+
+void CoreComponents::pauseOrResume() noexcept
+{
+    audio_paused_->store(!audio_paused_->load());
+}
+
 void CoreComponents::clearWAVFile()
 {
-    if (is_audio_finished_->load()) {
+    if (audio_finished_->load()) {
         std::string wav_filename = Utils::getWAVFileName(current_playing_audio_);
         std::filesystem::remove(wav_filename);
     }
@@ -158,9 +173,9 @@ CoreComponents::CoreComponents()
     , decoder1_(new ma_decoder)
     , decoder2_(new ma_decoder)
     , encoder_(new ma_encoder)
-    , is_decoder1_used_(new bool{false})
-    , is_audio_finished_(new std::atomic<bool>{true})
-    , is_audio_paused_(new std::atomic<bool>{false})
+    , decoder1_used_(new bool{false})
+    , audio_finished_(new std::atomic<bool>{true})
+    , audio_paused_(new std::atomic<bool>{false})
 {
     ma_device_config device_config  = ma_device_config_init(ma_device_type_playback);
     device_config.playback.format   = format_;
@@ -171,8 +186,9 @@ CoreComponents::CoreComponents()
     static Context context{
         .decoder1          = decoder1_,
         .decoder2          = decoder2_,
-        .is_decoder1_used  = is_decoder1_used_,
-        .is_audio_finished = is_audio_finished_,
+        .is_decoder1_used  = decoder1_used_,
+        .is_audio_finished = audio_finished_,
+        .is_audio_paused   = audio_paused_,
     };
     device_config.pUserData = &context;
 
@@ -205,8 +221,7 @@ CoreComponents::~CoreComponents()
 
 void CoreComponents::switchDecoder() noexcept
 {
-    *is_decoder1_used_ = !*is_decoder1_used_;
-    is_audio_finished_->store(false);
+    *decoder1_used_ = !*decoder1_used_;
 }
 
 ma_result CoreComponents::decodeToWAV(std::string_view input_file, std::string_view output_file)
@@ -264,7 +279,7 @@ ma_result CoreComponents::decodeToWAV(std::string_view input_file, std::string_v
 ma_result CoreComponents::reinitUnusedDecoder(std::string_view filename)
 {
     ma_result result = MA_SUCCESS;
-    if (*is_decoder1_used_) {
+    if (*decoder1_used_) {
         result = Utils::reinitDecoder(filename, &decoder_config_, decoder2_);
         if (result != MA_SUCCESS) {
             LOG("failed to reinitialize decoder2", LogType::ERROR, result);
@@ -299,9 +314,13 @@ void CoreComponents::deletePtr()
     delete decoder1_;
     delete decoder2_;
     delete encoder_;
-    delete is_decoder1_used_;
-    delete is_audio_finished_;
-    delete is_audio_paused_;
+    delete decoder1_used_;
+    delete audio_finished_;
+    delete audio_paused_;
 }
 
-CoreComponents CoreComponents::g_core;
+CoreComponents& CoreComponents::getInstance() noexcept
+{
+    static CoreComponents instance;
+    return instance;
+}

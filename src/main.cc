@@ -11,8 +11,8 @@
 
 int main()
 {
-    CoreComponents& core = CoreComponents::get();
-    core.play("./music/王力宏 - 需要人陪.flac");
+    CoreComponents& core = CoreComponents::getInstance();
+    core.play("./music/李宗盛 - 山丘.wav");
     while (true) {
         std::cout << "Press n to play next song\n";
         std::cout << "Press q to quit\n";
@@ -22,8 +22,8 @@ int main()
         if (input == "q") {
             break;
         }
-        else if (input == "n") {
-            core.play("./music/李宗盛 - 山丘.wav");
+        if (input == "n") {
+            core.moveCursorToEnd();
         }
         else if (input == "p") {
             core.pauseOrResume();
