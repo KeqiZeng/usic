@@ -5,9 +5,31 @@
 #include <string>
 #include <string_view>
 
+/**
+ * This callback function is responsible for audio data processing, which is required by miniaudio device.
+ *
+ * @param device Pointer to miniaudio device.
+ * @param output Pointer to the buffer where audio data should be written.
+ * @param input Pointer to the buffer containing input audio data (unused in this context).
+ * @param frame_count Number of PCM frames to process at a time.
+ */
 void dataCallback(ma_device* device, void* output, const void* input, ma_uint32 frame_count);
+
+/**
+ * Continuously monitors the audio playback status and switches to the next track when the current one finishes.
+ * It relies on the AudioFinishedCallbackSignals to determine when the audio is finished or if it should quit.
+ */
 void audioFinishedCallback();
 
+/**
+ * This structure contains the necessary information required by the dataCallback function.
+ *
+ * @var decoder1 Pointer to the first decoder.
+ * @var decoder2 Pointer to the second decoder.
+ * @var is_decoder1_used Pointer to a boolean indicating if decoder1 is being used now.
+ * @var is_audio_finished Pointer to a boolean indicating if the audio playback is finished.
+ * @var is_audio_paused Pointer to a boolean indicating if the audio playback is paused.
+ */
 struct Context
 {
     ma_decoder* decoder1{nullptr};
