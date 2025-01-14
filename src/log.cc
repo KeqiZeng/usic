@@ -4,7 +4,10 @@
 #include <filesystem>
 #include <format>
 #include <fstream>
+#include <mutex>
 #include <string_view>
+
+static std::mutex g_log_mutex;
 
 static void logMsg(
     std::string_view msg,
@@ -15,8 +18,17 @@ static void logMsg(
     ma_result result
 )
 {
+    // Filter out control characters but keep all other characters including Unicode
+    std::string filtered_msg;
+    filtered_msg.reserve(msg.size());
+    for (unsigned char c : msg) {
+        if (!std::iscntrl(c) || c == '\n' || c == '\t' || c == '\r') {
+            filtered_msg += c;
+        }
+    }
+
     if (result != MA_SUCCESS) {
-        msg = std::format("{} (ma_result: {})", msg, std::to_string(result));
+        filtered_msg = std::format("{} ({})", filtered_msg, ma_result_description(result));
     }
 
     const auto NOW        = std::chrono::system_clock::now();
@@ -34,7 +46,7 @@ static void logMsg(
         std::filesystem::path{source_file}.filename().string(), // 6
         line,                                                   // 7
         func_name,                                              // 8
-        msg                                                     // 9
+        filtered_msg                                            // 9
     );
 
     std::ofstream out_file(log_file.data(), std::ios::app);
@@ -55,6 +67,7 @@ void log(
     ma_result result
 )
 {
+    std::lock_guard<std::mutex> lock(g_log_mutex);
     switch (type) {
     case LogType::ERROR:
         logMsg(message, ERROR_LOG_FILE, file, line, func, result);
