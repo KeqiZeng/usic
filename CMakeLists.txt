@@ -16,7 +16,7 @@ add_executable(${PROJECT_NAME} ${SOURCES})
 
 include(FetchContent)
 
-## dependences ###
+### dependences ###
 # miniaudio
 FetchContent_Declare(
   miniaudio
@@ -26,7 +26,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(miniaudio)
 target_include_directories(${PROJECT_NAME} PRIVATE ${miniaudio_SOURCE_DIR})
 
-## test ###
+### test ###
 option(BUILD_TESTING "Build test targets" OFF)
 
 if(BUILD_TESTING)
