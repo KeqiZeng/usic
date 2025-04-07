@@ -13,7 +13,7 @@ add_executable(${PROJECT_NAME}_tests ${TEST_FILES} ${SRC_DIR}/music_list.cc ${SR
 
 target_link_libraries(${PROJECT_NAME}_tests PRIVATE Catch2::Catch2WithMain)
 target_include_directories(${PROJECT_NAME}_tests PRIVATE ${SRC_DIR})
-target_include_directories(${PROJECT_NAME}_tests PRIVATE ${miniaudio_SOURCE_DIR})
+target_include_directories(${PROJECT_NAME}_tests PRIVATE ${PROJECT_SOURCE_DIR}/external)
 list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
 include(CTest)
 include(Catch)

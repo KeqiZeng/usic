@@ -1,26 +1,72 @@
-#include "core.h"
-// #include "log.h"
+#include "client.h"
+#include "log.h"
+#include "server.h"
+#include "tools.h"
+#include "utils.h"
 #include <iostream>
+#include <unistd.h>
 
-int main()
+const int FATAL_ERROR = 1;
+
+int main(int argc, char** argv)
 {
-    CoreComponents& core = CoreComponents::getInstance();
-    core.play("./music/李宗盛 - 山丘.wav");
-    while (true) {
-        std::cout << "Press n to play next song\n";
-        std::cout << "Press q to quit\n";
-        std::cout << "Press p to pause or resume\n";
-        std::string input;
-        std::getline(std::cin, input);
-        if (input == "q") {
-            break;
+    bool has_server{false};
+    try {
+        has_server = Utils::isServerRunning();
+    }
+    catch (std::exception& e) {
+        std::cerr << e.what() << std::endl;
+        return FATAL_ERROR;
+    }
+
+    if (argc == 1) {
+        if (has_server) {
+            std::cerr << "Server is already running\n";
+            return 0;
         }
-        if (input == "n") {
-            core.moveCursorToEnd();
+
+        pid_t pid = fork();
+        if (pid < 0) {
+            // Forking failed
+            LOG("forking child process failed", LogType::ERROR);
+            return FATAL_ERROR;
         }
-        else if (input == "p") {
-            core.pauseOrResume();
+        if (pid > 0) {
+            // Parent process, exit
+            return 0;
         }
+
+        // change the name of server process
+        strncpy(argv[0], "usic server", sizeof("usic server"));
+        try {
+            Server::getInstance().run();
+        }
+        catch (std::exception& e) {
+            return FATAL_ERROR;
+        }
+        return 0;
+    }
+
+    try {
+        if (handleFlagOrTool(argc, argv)) {
+            return 0;
+        }
+    }
+    catch (std::exception& e) {
+        return FATAL_ERROR;
+    }
+
+    if (!has_server) {
+        std::cerr << "Server is not running\n";
+        return FATAL_ERROR;
+    }
+
+    try {
+        Client::getInstance().run(argc, argv);
+    }
+    catch (std::exception& e) {
+        std::cerr << e.what() << std::endl;
+        return FATAL_ERROR;
     }
     return 0;
 }

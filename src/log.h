@@ -6,8 +6,8 @@
 #include "miniaudio.h"
 #include "runtime_path.h"
 
-inline const std::string ERROR_LOG_FILE = (std::filesystem::path(RUNTIME_PATH) / "error.log").string();
-inline const std::string INFO_LOG_FILE  = (std::filesystem::path(RUNTIME_PATH) / "info.log").string();
+inline const std::string ERROR_LOG_FILE = (std::filesystem::path(RuntimePath::RUNTIME_PATH) / "error.log").string();
+inline const std::string INFO_LOG_FILE  = (std::filesystem::path(RuntimePath::RUNTIME_PATH) / "info.log").string();
 
 enum class LogType
 {
@@ -49,3 +49,5 @@ void log(
  */
 #define LOG(message, type, ...)                                                                         \
     log(message, type, std::string_view{__FILE__}, __LINE__, std::string_view{__func__}, ##__VA_ARGS__)
+
+void removeLogFiles();

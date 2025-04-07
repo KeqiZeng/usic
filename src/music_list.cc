@@ -17,44 +17,44 @@ MusicNode::MusicNode(std::string_view music)
 
 MusicList::~MusicList()
 {
-    this->clear();
+    clear();
 }
 
 void MusicList::load(std::string_view list_file_path)
 {
-    this->clear();
+    clear();
     std::filesystem::path list_file{list_file_path};
     std::ifstream file(list_file);
     if (file.is_open()) {
         std::string line;
         while (std::getline(file, line)) {
-            this->insertAfterTail(line);
+            insertAfterTail(line);
         }
         file.close();
     }
     else {
-        LOG(std::format("Failed to open file: {}", list_file_path), LogType::ERROR);
+        throw std::runtime_error("Failed to open file");
     }
     current_      = head_;
     next_to_play_ = current_;
 }
 
-[[nodiscard]] bool MusicList::isEmpty() const
+[[nodiscard]] bool MusicList::isEmpty() const noexcept
 {
     return count_ == 0;
 }
-[[nodiscard]] int MusicList::getCount() const
+[[nodiscard]] int MusicList::getCount() const noexcept
 {
     return count_;
 }
 [[nodiscard]] std::vector<std::string> MusicList::getList()
 {
     std::vector<std::string> list;
-    MusicNode* current = head_.get();
+    MusicNode* current = current_.get();
     do {
         list.push_back(current->music_);
         current = current->next_.get();
-    } while (current != head_.get());
+    } while (current != current_.get());
 
     return list;
 }
@@ -89,8 +89,7 @@ void MusicList::insertAfterTail(std::string_view music)
 void MusicList::insertAfterCurrent(std::string_view music)
 {
     if (!current_) {
-        LOG("current is null", LogType::ERROR);
-        return;
+        throw std::runtime_error("current is null");
     }
     auto new_node          = std::make_shared<MusicNode>(music);
     new_node->prev_        = current_;
@@ -103,8 +102,7 @@ void MusicList::insertAfterCurrent(std::string_view music)
 void MusicList::forward()
 {
     if (!current_) {
-        LOG("current is null", LogType::ERROR);
-        return;
+        throw std::runtime_error("current is null");
     }
     next_to_play_ = current_->next_;
 }
@@ -112,8 +110,7 @@ void MusicList::forward()
 void MusicList::backward()
 {
     if (!current_) {
-        LOG("current is null", LogType::ERROR);
-        return;
+        throw std::runtime_error("current is null");
     }
     next_to_play_ = current_->prev_;
 }
@@ -121,8 +118,7 @@ void MusicList::backward()
 void MusicList::shuffle()
 {
     if (!current_) {
-        LOG("current is null", LogType::ERROR);
-        return;
+        throw std::runtime_error("current is null");
     }
 
     // generate a random number between 1 and 100
@@ -146,7 +142,7 @@ void MusicList::shuffle()
     }
 }
 
-bool MusicList::moveTo(std::string_view music)
+bool MusicList::moveTo(std::string_view music) noexcept
 {
     auto current = current_;
     do {
@@ -159,7 +155,7 @@ bool MusicList::moveTo(std::string_view music)
     return false;
 }
 
-void MusicList::updateCurrent()
+void MusicList::updateCurrent() noexcept
 {
     current_ = next_to_play_;
 }
@@ -167,22 +163,21 @@ void MusicList::updateCurrent()
 void MusicList::single()
 {
     if (!current_) {
-        LOG("current is null", LogType::ERROR);
-        return;
+        throw std::runtime_error("current is null");
     }
     next_to_play_ = current_;
 }
 
-const std::optional<std::string> MusicList::getMusic() const
+const std::optional<const std::string> MusicList::getMusic() const
 {
     if (!next_to_play_) {
-        LOG("next_to_play is null", LogType::ERROR);
+        throw std::runtime_error("next_to_play is null");
         return std::nullopt;
     }
     return next_to_play_->music_;
 }
 
-void MusicList::clear()
+void MusicList::clear() noexcept
 {
     if (!head_) {
         return;

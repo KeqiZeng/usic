@@ -14,17 +14,7 @@ set(SOURCE_DIR ${PROJECT_SOURCE_DIR}/src)
 file(GLOB SOURCES ${SOURCE_DIR}/*.cc)
 add_executable(${PROJECT_NAME} ${SOURCES})
 
-include(FetchContent)
-
-### dependences ###
-# miniaudio
-FetchContent_Declare(
-  miniaudio
-  GIT_REPOSITORY https://github.com/mackron/miniaudio
-  GIT_TAG 6a8a756b88feccfdf6c73345b44017b0d690d849
-)
-FetchContent_MakeAvailable(miniaudio)
-target_include_directories(${PROJECT_NAME} PRIVATE ${miniaudio_SOURCE_DIR})
+target_include_directories(${PROJECT_NAME} PRIVATE ${PROJECT_SOURCE_DIR}/external)
 
 ### test ###
 option(BUILD_TESTING "Build test targets" OFF)

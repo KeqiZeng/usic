@@ -1,6 +1,6 @@
 #include "thread_signals.h"
 
-void AudioFinishedCallbackSignals::signal() noexcept
+void AudioFinishedCallbackSignals::signalAudioFinished() noexcept
 {
     audio_finished_.store(true);
     flag_.test_and_set();

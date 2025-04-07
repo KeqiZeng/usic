@@ -79,3 +79,13 @@ void log(
         break;
     }
 }
+
+void removeLogFiles()
+{
+    if (std::filesystem::exists(ERROR_LOG_FILE)) {
+        std::filesystem::remove(ERROR_LOG_FILE);
+    }
+    if (std::filesystem::exists(INFO_LOG_FILE)) {
+        std::filesystem::remove(INFO_LOG_FILE);
+    }
+}

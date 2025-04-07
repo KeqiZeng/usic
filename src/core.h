@@ -1,7 +1,11 @@
 #pragma once
 
 #include "miniaudio.h"
+#include "music_list.h"
 #include <atomic>
+#include <deque>
+#include <mutex>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -47,12 +51,24 @@ class CoreComponents
     CoreComponents(CoreComponents&&)                 = delete;
     CoreComponents& operator=(CoreComponents&&)      = delete;
 
-    ma_result play(std::string_view filename);
-    ma_result moveCursorToStart();
-    ma_result moveCursorToEnd();
-    [[nodiscard]] std::string getCurrentPlayingAudio() const noexcept;
+    ma_result play(std::string_view audio);
+    void setNextAudio();
+    [[nodiscard]] std::optional<const std::string> getAudio() const;
+    [[nodiscard]] MusicList& getMusicList() noexcept;
+    void lockListInfoMutex();
+    void unlockListInfoMutex();
+    void setPlayMode(PlayMode mode) noexcept;
+    [[nodiscard]] PlayMode getPlayMode() const noexcept;
     void pauseOrResume() noexcept;
-    void clearWAVFile();
+    ma_result setVolume(float volume);
+    [[nodiscard]] float getCurrentVolume() const noexcept;
+    ma_result mute();
+    [[nodiscard]] std::string getCurrentPlayingAudio() const noexcept;
+    [[nodiscard]] std::optional<const float> getCurrentProgress() const;
+    [[nodiscard]] ma_decoder* getCurrentDecoder() const noexcept;
+    [[nodiscard]] ma_uint32 getSampleRate() const noexcept;
+    [[nodiscard]] bool shouldQuit() const noexcept;
+    void quit();
 
     static CoreComponents& getInstance() noexcept;
 
@@ -60,9 +76,13 @@ class CoreComponents
     CoreComponents();
     ~CoreComponents();
 
+    void initMusicList();
+    void initPlayMode() noexcept;
     void switchDecoder() noexcept;
     ma_result decodeToWAV(std::string_view input_file, std::string_view output_file);
     ma_result reinitUnusedDecoder(std::string_view filename);
+    void removeWAVFile();
+    void removeAllWAVFiles();
     void deletePtr();
 
     ma_device* device_{nullptr};
@@ -72,13 +92,23 @@ class CoreComponents
     ma_encoder* encoder_{nullptr};
     ma_encoder_config encoder_config_{};
 
+    ma_format format_{ma_format_s16};
+    ma_uint32 channels_{2};
+    ma_uint32 sample_rate_{44100};
+
     bool* decoder1_used_{nullptr};
     std::atomic<bool>* audio_finished_{nullptr};
     std::atomic<bool>* audio_paused_{nullptr};
 
-    std::string current_playing_audio_;
+    MusicList* music_list_{nullptr};
+    std::mutex list_info_mutex_;
+    PlayMode play_mode_;
 
-    ma_format format_{ma_format_s16};
-    ma_uint32 channels_{2};
-    ma_uint32 sample_rate_{44100};
+    std::string current_playing_audio_;
+    float current_volume_{1.0f};
+    float last_volume_{1.0f};
+
+    std::deque<std::string> cached_wav_files_;
+
+    bool should_quit_{false};
 };

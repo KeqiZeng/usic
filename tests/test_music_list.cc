@@ -112,7 +112,7 @@ TEST_CASE("The methods of MusicList can work properly")
         music_list->insertAfterCurrent("J");
 
         CHECK(music_list->getCount() == 10);
-        CHECK(music_list->getList() == std::vector<std::string>({"A", "F", "B", "J", "I", "H", "G", "C", "D", "E"}));
+        CHECK(music_list->getList() == std::vector<std::string>({"B", "J", "I", "H", "G", "C", "D", "E", "A", "F"}));
 
         music_list->moveTo("I");
         music_list->updateCurrent();
@@ -125,7 +125,7 @@ TEST_CASE("The methods of MusicList can work properly")
         CHECK(music_list->getCount() == 15);
         CHECK(
             music_list->getList() ==
-            std::vector<std::string>({"A", "F", "B", "J", "I", "O", "N", "M", "L", "K", "H", "G", "C", "D", "E"})
+            std::vector<std::string>({"I", "O", "N", "M", "L", "K", "H", "G", "C", "D", "E", "A", "F", "B", "J"})
         );
 
         music_list->clear();

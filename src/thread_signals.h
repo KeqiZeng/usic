@@ -2,6 +2,9 @@
 
 #include <atomic>
 
+/*
+ * This class is used for the communication between the audioFinishedCallback thread and the main thread.
+ */
 class AudioFinishedCallbackSignals
 {
   public:
@@ -10,7 +13,7 @@ class AudioFinishedCallbackSignals
     AudioFinishedCallbackSignals(AudioFinishedCallbackSignals&&)            = delete;
     AudioFinishedCallbackSignals& operator=(AudioFinishedCallbackSignals&&) = delete;
 
-    void signal() noexcept;
+    void signalAudioFinished() noexcept;
     void reset() noexcept;
     void wait(bool predicate) const noexcept;
     bool isAudioFinished() const noexcept;
