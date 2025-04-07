@@ -5,7 +5,7 @@ A lightweight command-line offline music player built with [miniaudio](https://g
 ## Features
 
 - Simple and fully customizable command-line interface
-- Built on miniaudio for high-quality audio playback
+- Low resource usage (both CPU and memory)
 - Support for multiple music formats (FLAC, MP3, WAV)
 - Support common music playback controls
 - Playlist management
