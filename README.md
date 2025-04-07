@@ -81,5 +81,4 @@ The following commands require server is running:
 `usic` is configured by editing `src/config.h`, where more details can be found.
 
 ## License
-
 This project is licensed under the [MIT License](https://opensource.org/licenses/MIT).
