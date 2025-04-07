@@ -1,11 +1,9 @@
-# Usic
-
 A lightweight command-line offline music player built with [miniaudio](https://github.com/mackron/miniaudio) and modern C++.
 
-## Features
+# Features
 
 - Simple and fully customizable command-line interface
-- Built on miniaudio for high-quality audio playback
+- Low resource usage (both CPU and memory)
 - Support for multiple music formats (FLAC, MP3, WAV)
 - Support common music playback controls
 - Playlist management
@@ -13,7 +11,7 @@ A lightweight command-line offline music player built with [miniaudio](https://g
 - Volume control
 - Support multiple play modes - sequence, shuffle, single
 
-## Requirements
+# Requirements
 `git`
 `make`
 `camke`
@@ -21,7 +19,7 @@ A lightweight command-line offline music player built with [miniaudio](https://g
 `C++ Compiler` that supports `C++20`
 `fzf`(optional)
 
-## Setup
+# Setup
 1. Clone this repository `git clone https://github.com/KeqiZeng/usic`.
 2. Change directory to `cd usic`.
 3. Set the `USIC_LIBRARY` in `src/config.h`.
@@ -32,7 +30,7 @@ sudo make clean release install
 ```
 6. `usic play` or `usic play "audio_filename.flac"` to play an audio file.
 
-## Commands
+# Commands
 
 - `usic`: Start the server
 
@@ -45,7 +43,7 @@ The following commands require server is running:
 
 - `usic quit`: Quit the server
 
-### Basic Playback
+## Basic Playback
 
 - `usic play [audio_file]`: Play specified track (or the first one in playlist if not provided)
 - `usic pause`: Pause/Resume playback
@@ -53,19 +51,19 @@ The following commands require server is running:
 - `usic play_prev`: Play previous track
 - `usic play_later <music_file>`: Play a specified track after the current one is over
 
-### Playlist Management
+## Playlist Management
 
 - `usic load <playlist_file>`: Load a playlist
 - `usic get_list`: Show the current playlist, the playing track is at the top of the list
 
-### Playback Control
+## Playback Control
 
 - `usic seek_forward`: Move cursor forward
 - `usic seek_backward`: Move cursor backward
 - `usic seek_to <MM:SS>`: Seek cursor to specific time
 - `usic get_progress`: Show current playback progress
 
-### Volume Control
+## Volume Control
 
 - `usic volume_up`: Increase volume
 - `usic volume_down`: Decrease volume
@@ -73,12 +71,12 @@ The following commands require server is running:
 - `usic get_volume`: Show the current volume
 - `usic mute`: Toggle mute
 
-### Play Mode
+## Play Mode
 - `usic set_mode`: Set the play mode, the argument should be one of [sequence, shuffle, single]
 - `usic get_mode`: Show the current play mode
 
-## Configuration
+# Configuration
 `usic` is configured by editing `src/config.h`, where more details can be found.
 
-## License
+# License
 This project is licensed under the [MIT License](https://opensource.org/licenses/MIT).
