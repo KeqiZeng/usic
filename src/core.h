@@ -1,103 +1,114 @@
 #pragma once
-#include <memory>
-#include <mutex>
 
 #include "miniaudio.h"
 #include "music_list.h"
+#include <atomic>
+#include <deque>
+#include <mutex>
+#include <optional>
+#include <string>
+#include <string_view>
 
-#define LOADING_FLAGS \
-  MA_SOUND_FLAG_NO_PITCH | MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC
+/**
+ * This callback function is responsible for audio data processing, which is required by miniaudio device.
+ *
+ * @param device Pointer to miniaudio device.
+ * @param output Pointer to the buffer where audio data should be written.
+ * @param input Pointer to the buffer containing input audio data (unused in this context).
+ * @param frame_count Number of PCM frames to process at a time.
+ */
+void dataCallback(ma_device* device, void* output, const void* input, ma_uint32 frame_count);
 
-class SoundPack;
-class MaComponents;
-class UserData;
-class QuitControl;
+/**
+ * Continuously monitors the audio playback status and switches to the next track when the current one finishes.
+ * It relies on the AudioFinishedCallbackSignals to determine when the audio is finished or if it should quit.
+ */
+void audioFinishedCallback();
 
-struct SoundInitNotification {
-  ma_async_notification_callbacks cb;
-  void* pMyData;
+/**
+ * This structure contains the necessary information required by the dataCallback function.
+ *
+ * @var decoder1 Pointer to the first decoder.
+ * @var decoder2 Pointer to the second decoder.
+ * @var is_decoder1_used Pointer to a boolean indicating if decoder1 is being used now.
+ * @var is_audio_finished Pointer to a boolean indicating if the audio playback is finished.
+ * @var is_audio_paused Pointer to a boolean indicating if the audio playback is paused.
+ */
+struct Context
+{
+    ma_decoder* decoder1{nullptr};
+    ma_decoder* decoder2{nullptr};
+    bool* is_decoder1_used{nullptr};
+    std::atomic<bool>* is_audio_finished{nullptr};
+    std::atomic<bool>* is_audio_paused{nullptr};
 };
 
-class SoundPack {
-  friend void sound_init_notification_callback(
-      ma_async_notification* pNotification);
-  // friend void sound_at_end_callback(void* pUserData, ma_sound* pSound);
-  friend ma_result play_internal(ma_engine* pEngine, SoundPack* pSound_to_play,
-                                 const std::string& musicToPlay,
-                                 std::string* musicPlaying,
-                                 MusicList* musicList,
-                                 SoundPack* pSound_to_register,
-                                 QuitControl* quitC, bool* random,
-                                 bool* repetitive);
+class CoreComponents
+{
+  public:
+    CoreComponents(const CoreComponents&)            = delete;
+    CoreComponents& operator=(const CoreComponents&) = delete;
+    CoreComponents(CoreComponents&&)                 = delete;
+    CoreComponents& operator=(CoreComponents&&)      = delete;
 
- private:
-  bool isInitialized{false};
-  bool isPlaying{false};
-  std::mutex mtx;
-  std::unique_ptr<SoundInitNotification> soundInitNotification{nullptr};
+    ma_result play(std::string_view audio);
+    void setNextAudio();
+    [[nodiscard]] std::optional<const std::string> getAudio() const;
+    [[nodiscard]] MusicList& getMusicList() noexcept;
+    void lockListInfoMutex();
+    void unlockListInfoMutex();
+    void setPlayMode(PlayMode mode) noexcept;
+    [[nodiscard]] PlayMode getPlayMode() const noexcept;
+    void pauseOrResume() noexcept;
+    ma_result setVolume(float volume);
+    [[nodiscard]] float getCurrentVolume() const noexcept;
+    ma_result mute();
+    [[nodiscard]] std::string getCurrentPlayingAudio() const noexcept;
+    [[nodiscard]] std::optional<const float> getCurrentProgress() const;
+    [[nodiscard]] ma_decoder* getCurrentDecoder() const noexcept;
+    [[nodiscard]] ma_uint32 getSampleRate() const noexcept;
+    [[nodiscard]] bool shouldQuit() const noexcept;
+    void quit();
 
- public:
-  std::unique_ptr<ma_sound> pSound{nullptr};
-  SoundPack();
-  ~SoundPack();
+    static CoreComponents& getInstance() noexcept;
 
-  ma_result init(ma_engine* pEngine, const std::string& pFilePath,
-                 ma_uint32 flags);
-  void uninit();
-  bool is_initialized();
-  bool is_playing();
+  private:
+    CoreComponents();
+    ~CoreComponents();
+
+    void initMusicList();
+    void initPlayMode() noexcept;
+    void switchDecoder() noexcept;
+    ma_result decodeToWAV(std::string_view input_file, std::string_view output_file);
+    ma_result reinitUnusedDecoder(std::string_view filename);
+    void removeWAVFile();
+    void removeAllWAVFiles();
+    void deletePtr();
+
+    ma_device* device_{nullptr};
+    ma_decoder* decoder1_{nullptr};
+    ma_decoder* decoder2_{nullptr};
+    ma_decoder_config decoder_config_{};
+    ma_encoder* encoder_{nullptr};
+    ma_encoder_config encoder_config_{};
+
+    ma_format format_{ma_format_s16};
+    ma_uint32 channels_{2};
+    ma_uint32 sample_rate_{44100};
+
+    bool* decoder1_used_{nullptr};
+    std::atomic<bool>* audio_finished_{nullptr};
+    std::atomic<bool>* audio_paused_{nullptr};
+
+    MusicList* music_list_{nullptr};
+    std::mutex list_info_mutex_;
+    PlayMode play_mode_;
+
+    std::string current_playing_audio_;
+    float current_volume_{1.0f};
+    float last_volume_{1.0f};
+
+    std::deque<std::string> cached_wav_files_;
+
+    bool should_quit_{false};
 };
-
-class MaComponents {
- public:
-  std::unique_ptr<ma_engine> pEngine;
-  std::unique_ptr<SoundPack> pSound_to_play;
-  std::unique_ptr<SoundPack> pSound_to_register;
-
-  MaComponents();
-  ~MaComponents();
-
-  void ma_comp_init_engine();
-};
-
-class UserData {
- public:
-  ma_engine* pEngine;
-  SoundPack* pSound_to_play;
-  SoundPack* pSound_to_register;
-  QuitControl* quitC;
-  MusicList* musicList;
-  std::string* musicPlaying;
-  bool* random;
-  bool* repetitive;
-
-  UserData(ma_engine* _pEngine, SoundPack* _pSound_to_play,
-           SoundPack* _pSound_to_register, QuitControl* _quitC,
-           MusicList* _musicList, std::string* _musicPlaying, bool* _random,
-           bool* _repetitive);
-};
-
-class QuitControl {
-  friend auto cleanFunc(MaComponents* pMa, QuitControl* quitC) -> void;
-  std::mutex mtx;
-  std::condition_variable cv;
-  bool end{false};
-  bool quitF{false};
-
- public:
-  void signal();
-  void reset();
-  void quit();
-  bool at_end();
-  bool get_quit_flag();
-};
-
-ma_result play_internal(ma_engine* pEngine, SoundPack* pSound_to_play,
-                        const std::string& musicToPlay,
-                        std::string* musicPlaying, MusicList* musicList,
-                        SoundPack* pSound_to_register, QuitControl* quitC,
-                        bool* random, bool* repetitive);
-
-void cleanFunc(MaComponents* pMa, QuitControl* quitC);
-void sound_at_end_callback(void* pUserData, ma_sound* pSound);
-void sound_init_notification_callback(ma_async_notification* pNotification);

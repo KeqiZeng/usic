@@ -1,45 +1,36 @@
 #pragma once
-#include <string>
-
-#include "config.h"
 #include "core.h"
-#include "miniaudio.h"
-#include "music_list.h"
-#include "utils.h"
+#include <optional>
+#include <string>
+#include <string_view>
+#include <vector>
 
-class Progress {
-  std::string str;
-  float percent;
+namespace Commands
+{
 
- public:
-  void init(const std::string& _str, float _percent);
-  const std::string make_bar();
-};
+ma_result play(std::string_view audio);
+void pause();
+ma_result playNext();
+ma_result playPrev();
+ma_result playLater(std::string_view audio);
 
-namespace Commands {
+void load(std::string_view list);
+std::vector<std::string> getList();
 
-void load(const std::string& listPath, MusicList* musicList, Config* config);
-ma_result play(MaComponents* pMa, const std::string& musicToPlay,
-               std::string* musicPlaying, MusicList* musicList,
-               QuitControl* quitC, Config* config);
+ma_result seekForward();
+ma_result seekBackward();
+ma_result seekTo(std::string_view time);
+std::optional<const std::string> getProgressBar();
 
-void play_later(Config* config, const std::string& music,
-                MusicList* music_list);
-ma_result play_next(MaComponents* pMa);
-ma_result play_prev(MaComponents* pMa, MusicList* musicList);
-ma_result pause(MaComponents* pMa);
-ma_result cursor_forward(MaComponents* pMa);
-ma_result cursor_backward(MaComponents* pMa);
-ma_result set_cursor(MaComponents* pMa, const std::string& time);
-ma_result get_current_progress(MaComponents* pMa, Progress* currentProgress);
-ma_result volume_up(ma_engine* pEngine);
-ma_result volume_down(ma_engine* pEngine);
-ma_result set_volume(ma_engine* pEngine, const std::string& volumeStr);
-ma_result get_volume(ma_engine* pEngine, float* volume);
-ma_result mute(ma_engine* pEngine);
-void set_random(Config* config);
-void set_repetitive(Config* config);
-std::vector<std::string> list(MusicList* musicList);
-void quit(MaComponents* pMa, QuitControl* quitC);
+ma_result volumeUp();
+ma_result volumeDown();
+ma_result setVolume(std::string_view volume);
+float getVolume();
+ma_result mute();
 
-}  // namespace Commands
+void setMode(PlayMode mode);
+PlayMode getMode();
+
+void quit();
+
+} // namespace Commands

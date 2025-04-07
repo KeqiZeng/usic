@@ -10,31 +10,13 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
 endif()
 
 project(usic)
-set(SOURCES src/usic.cc src/client.cc src/commands.cc src/core.cc src/music_list.cc src/runtime.cc src/server.cc src/utils.cc)
+set(SOURCE_DIR ${PROJECT_SOURCE_DIR}/src)
+file(GLOB SOURCES ${SOURCE_DIR}/*.cc)
 add_executable(${PROJECT_NAME} ${SOURCES})
 
-include(FetchContent)
+target_include_directories(${PROJECT_NAME} PRIVATE ${PROJECT_SOURCE_DIR}/external)
 
-# ## dependences ###
-# miniaudio
-FetchContent_Declare(
-  miniaudio
-  GIT_REPOSITORY https://github.com/mackron/miniaudio
-  GIT_TAG 0.11.21
-)
-FetchContent_MakeAvailable(miniaudio)
-target_include_directories(${PROJECT_NAME} PRIVATE ${miniaudio_SOURCE_DIR})
-
-# fmt
-FetchContent_Declare(
-  fmt
-  GIT_REPOSITORY https://github.com/fmtlib/fmt
-  GIT_TAG 10.2.1
-)
-FetchContent_MakeAvailable(fmt)
-target_link_libraries(${PROJECT_NAME} fmt::fmt)
-
-# ## test ###
+### test ###
 option(BUILD_TESTING "Build test targets" OFF)
 
 if(BUILD_TESTING)

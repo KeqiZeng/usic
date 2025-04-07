@@ -1,48 +1,58 @@
 #pragma once
-#include <fstream>
+#include <memory>
 #include <string>
 #include <vector>
 
-#include "fmt/core.h"
-#include "runtime.h"
-
-class MusicNode {
-  friend class MusicList;
-
- private:
-  const std::string music;
-  std::shared_ptr<MusicNode> prev{nullptr};
-  std::shared_ptr<MusicNode> next{nullptr};
-
- public:
-  MusicNode() = default;
-  MusicNode(std::string _music);
-  // ~MusicNode() = default;
-
-  [[nodiscard]] const std::string get_music() const;
+enum class PlayMode
+{
+    SEQUENCE,
+    SHUFFLE,
+    SINGLE,
 };
 
-class MusicList {
- private:
-  std::shared_ptr<MusicNode> head{nullptr};
-  std::shared_ptr<MusicNode> tail{nullptr};
-  int count{0};
+class MusicNode
+{
+  public:
+    MusicNode() = default;
+    MusicNode(std::string_view music);
 
- public:
-  MusicList() = default;
-  MusicList(Config* config, const std::string& listFile);
-  ~MusicList();
+  private:
+    const std::string music_;
+    std::shared_ptr<MusicNode> prev_{nullptr};
+    std::shared_ptr<MusicNode> next_{nullptr};
 
-  void load(const std::string& listPath, Config* config, bool reload = true);
-  [[nodiscard]] bool is_empty() const;
-  [[nodiscard]] int get_count() const;
-  [[nodiscard]] std::vector<std::string> get_list();
-  void tail_in(const std::string& music);
-  std::shared_ptr<MusicNode> head_out();
-  std::shared_ptr<MusicNode> tail_out();
-  void head_in(const std::string& music);
-  std::shared_ptr<MusicNode> random_out();
-  bool contain(const std::string& music);
-  bool remove(const std::string& music);
-  void clear();
+    friend class MusicList;
+};
+
+class MusicList
+{
+  public:
+    MusicList() = default;
+    ~MusicList();
+    MusicList(const MusicList&)            = delete;
+    MusicList(MusicList&&)                 = delete;
+    MusicList& operator=(const MusicList&) = delete;
+    MusicList& operator=(MusicList&&)      = delete;
+
+    void load(std::string_view list_path);
+    [[nodiscard]] bool isEmpty() const noexcept;
+    [[nodiscard]] int getCount() const noexcept;
+    [[nodiscard]] std::vector<std::string> getList();
+    void insertAfterTail(std::string_view music);
+    void insertAfterCurrent(std::string_view music);
+    void forward();
+    void backward();
+    void shuffle();
+    bool moveTo(std::string_view music) noexcept;
+    void updateCurrent() noexcept;
+    void single();
+    [[nodiscard]] const std::optional<const std::string> getMusic() const;
+    void clear() noexcept;
+
+  private:
+    std::shared_ptr<MusicNode> head_{nullptr};
+    std::shared_ptr<MusicNode> tail_{nullptr};
+    std::shared_ptr<MusicNode> current_{nullptr};
+    std::shared_ptr<MusicNode> next_to_play_{nullptr};
+    int count_{0};
 };

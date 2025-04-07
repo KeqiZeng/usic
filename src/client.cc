@@ -1,51 +1,46 @@
 #include "client.h"
-
+#include "named_pipe.h"
+#include "runtime_path.h"
+#include "utils.h"
+#include <iostream>
 #include <string>
 
-const std::string concatenateArgs(int argc, char* argv[]) {
-  std::string result;
-
-  for (int i = 1; i < argc; ++i) {
-    std::string arg = argv[i];
-
-    // check if the argument contains spaces
-    if (arg.find(' ') != std::string::npos) {
-      result += "\"" + arg + "\"";  // add quotes
-    } else {
-      result += arg;
-    }
-
-    if (i < argc - 1) {  // add separator if not the last argument
-      result += " ";
-    }
-  }
-
-  return result;
+Client::Client()
+    : pipe_to_client_(NamedPipe(RuntimePath::SERVER_TO_CLIENT_PIPE))
+    , pipe_from_client_(NamedPipe(RuntimePath::CLIENT_TO_SERVER_PIPE))
+{
 }
 
-void client(int argc, char* argv[]) {
-  auto pipeToServer = std::make_unique<NamedPipe>(PIPE_TO_SERVER);
-  auto pipeToClient = std::make_unique<NamedPipe>(PIPE_TO_CLIENT);
+void Client::run(int argc, char** argv)
+{
+    pipe_from_client_.openPipe(OpenMode::WR_ONLY_BLOCK);
+    pipe_to_client_.openPipe(OpenMode::RD_ONLY_BLOCK);
 
-  pipeToServer->open_pipe(OpenMode::WR_ONLY_BLOCK);
-  pipeToClient->open_pipe(OpenMode::RD_ONLY_BLOCK);
+    // send command to server
+    const std::string CMD = Utils::concatenateArgs(argc, argv);
+    pipe_from_client_.writeIn(CMD);
 
-  // send command to server
-  const std::string cmd = concatenateArgs(argc, argv);
-  pipeToServer->writeIn(cmd);
-
-  // receive response from server
-  std::string msg;
-  while (true) {
-    msg = pipeToClient->readOut();
-    if (msg != "") {
-      if (msg == OVER) {
-        break;
-      }
-      if (msg != NO_MESSAGE) {
-        fmt::print("{}\n", msg);
-      }
-      pipeToServer->writeIn(GOT);
+    // receive responses from server
+    std::string msg;
+    while (true) {
+        msg = pipe_to_client_.readOut();
+        if (msg != "") {
+            if (msg == SpecialMessages::OVER) {
+                break;
+            }
+            if (msg != SpecialMessages::NO_MESSAGE) {
+                std::cout << msg << "\n";
+            }
+            pipe_from_client_.writeIn(SpecialMessages::GOT);
+        }
     }
-  }
+
+    pipe_from_client_.closePipe();
+    pipe_to_client_.closePipe();
+}
+
+Client& Client::getInstance() noexcept
+{
+    static Client instance;
+    return instance;
 }

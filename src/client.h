@@ -1,5 +1,20 @@
 #pragma once
-#include "runtime.h"
+#include "named_pipe.h"
 
-const std::string concatenateArgs(int argc, char* argv[]);
-void client(int argc, char* argv[]);
+class Client
+{
+  public:
+    Client();
+    ~Client()                        = default;
+    Client(const Client&)            = delete;
+    Client(Client&&)                 = delete;
+    Client& operator=(const Client&) = delete;
+    Client& operator=(Client&&)      = delete;
+
+    void run(int argc, char** argv);
+    static Client& getInstance() noexcept;
+
+  private:
+    NamedPipe pipe_to_client_;
+    NamedPipe pipe_from_client_;
+};
