@@ -164,6 +164,7 @@ void CoreComponents::unlockListInfoMutex()
 void CoreComponents::setPlayMode(PlayMode mode) noexcept
 {
     play_mode_ = mode;
+    setNextAudio();
 }
 
 PlayMode CoreComponents::getPlayMode() const noexcept

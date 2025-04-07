@@ -13,38 +13,14 @@
 namespace Commands
 {
 
-void load(std::string_view list)
-{
-    auto& core       = CoreComponents::getInstance();
-    auto& music_list = core.getMusicList();
-    try {
-        music_list.load(list);
-    }
-    catch (const std::exception& e) {
-        LOG(e.what(), LogType::ERROR);
-        throw;
-    }
-}
-
 ma_result play(std::string_view audio)
 {
     return CoreComponents::getInstance().play(audio);
 }
 
-ma_result playLater(std::string_view audio)
+void pause()
 {
-    auto& music_list = CoreComponents::getInstance().getMusicList();
-    try {
-        if (!music_list.moveTo(audio)) {
-            music_list.insertAfterCurrent(audio);
-            music_list.forward();
-        }
-    }
-    catch (const std::exception& e) {
-        LOG(e.what(), LogType::ERROR);
-        return MA_INVALID_DATA;
-    }
-    return MA_SUCCESS;
+    CoreComponents::getInstance().pauseOrResume();
 }
 
 static ma_result seekCurrentDecoderToEnd()
@@ -64,6 +40,22 @@ ma_result playNext()
     return seekCurrentDecoderToEnd();
 }
 
+ma_result playLater(std::string_view audio)
+{
+    auto& music_list = CoreComponents::getInstance().getMusicList();
+    try {
+        if (!music_list.moveTo(audio)) {
+            music_list.insertAfterCurrent(audio);
+            music_list.forward();
+        }
+    }
+    catch (const std::exception& e) {
+        LOG(e.what(), LogType::ERROR);
+        return MA_INVALID_DATA;
+    }
+    return MA_SUCCESS;
+}
+
 ma_result playPrev()
 {
     auto& core = CoreComponents::getInstance();
@@ -71,9 +63,22 @@ ma_result playPrev()
     return seekCurrentDecoderToEnd();
 }
 
-void pause()
+void load(std::string_view list)
 {
-    CoreComponents::getInstance().pauseOrResume();
+    auto& core       = CoreComponents::getInstance();
+    auto& music_list = core.getMusicList();
+    try {
+        music_list.load(list);
+    }
+    catch (const std::exception& e) {
+        LOG(e.what(), LogType::ERROR);
+        throw;
+    }
+}
+
+std::vector<std::string> getList()
+{
+    return CoreComponents::getInstance().getMusicList().getList();
 }
 
 static std::optional<unsigned int> getCursorInSeconds()
@@ -234,11 +239,6 @@ void setMode(PlayMode mode)
 PlayMode getMode()
 {
     return CoreComponents::getInstance().getPlayMode();
-}
-
-std::vector<std::string> getList()
-{
-    return CoreComponents::getInstance().getMusicList().getList();
 }
 
 void quit()
