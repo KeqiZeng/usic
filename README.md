@@ -12,14 +12,21 @@ A lightweight command-line offline music player built with [miniaudio](https://g
 - Support multiple play modes - sequence, shuffle, single
 
 # Requirements
+
 `git`
+
 `make`
+
 `camke`
+
 `ninja`
+
 `C++ Compiler` that supports `C++20`
+
 `fzf`(optional)
 
 # Setup
+
 1. Clone this repository `git clone https://github.com/KeqiZeng/usic`.
 2. Change directory to `cd usic`.
 3. Set the `USIC_LIBRARY` in `src/config.h`.
@@ -72,11 +79,14 @@ The following commands require server is running:
 - `usic mute`: Toggle mute
 
 ## Play Mode
+
 - `usic set_mode`: Set the play mode, the argument should be one of [sequence, shuffle, single]
 - `usic get_mode`: Show the current play mode
 
 # Configuration
+
 `usic` is configured by editing `src/config.h`, where more details can be found.
 
 # License
+
 This project is licensed under the [MIT License](https://opensource.org/licenses/MIT).
