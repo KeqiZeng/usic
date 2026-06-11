@@ -31,6 +31,7 @@ fn main() -> Result<()> {
 struct App {
     cfg: Config,
     status: Option<Status>,
+    status_updated_at: Option<Instant>,
     playlist: Vec<String>,
     playlists: Vec<String>,
     library: Vec<String>,
@@ -43,6 +44,7 @@ struct App {
     mode: UiMode,
     input: String,
     message: String,
+    pending_delete_playlist: Option<String>,
 }
 
 #[derive(Clone)]
@@ -68,6 +70,7 @@ impl App {
             library: library::scan(&cfg)?,
             cfg,
             status: None,
+            status_updated_at: None,
             playlist: Vec::new(),
             playlists: Vec::new(),
             visible: Vec::new(),
@@ -79,6 +82,7 @@ impl App {
             mode: UiMode::Normal,
             input: String::new(),
             message: String::new(),
+            pending_delete_playlist: None,
         };
         app.rebuild_visible();
         Ok(app)
@@ -86,7 +90,9 @@ impl App {
 
     fn run(&mut self, mut terminal: ratatui::DefaultTerminal) -> Result<()> {
         self.refresh();
-        let mut last_refresh = Instant::now();
+        let mut next_status_refresh = Instant::now() + Duration::from_secs(1);
+        let mut next_playlist_refresh = Instant::now() + Duration::from_secs(2);
+        let mut next_draw = Instant::now() + Duration::from_secs(1);
         let mut dirty = true;
 
         loop {
@@ -95,7 +101,14 @@ impl App {
                 dirty = false;
             }
 
-            if event::poll(Duration::from_millis(50))? {
+            let now = Instant::now();
+            let timeout = [next_status_refresh, next_playlist_refresh, next_draw]
+                .into_iter()
+                .map(|deadline| deadline.saturating_duration_since(now))
+                .min()
+                .unwrap_or_else(|| Duration::from_millis(250));
+
+            if event::poll(timeout)? {
                 if let Event::Key(key) = event::read()? {
                     if key.kind == KeyEventKind::Press {
                         if self.handle_key(key)? {
@@ -106,10 +119,19 @@ impl App {
                 }
             }
 
-            if last_refresh.elapsed() >= Duration::from_millis(250) {
-                self.refresh();
-                last_refresh = Instant::now();
-                dirty = true;
+            let now = Instant::now();
+            if now >= next_status_refresh {
+                dirty |= self.refresh_status();
+                next_status_refresh = now + Duration::from_secs(1);
+            }
+            if now >= next_playlist_refresh {
+                dirty |= self.refresh_playlists();
+                dirty |= self.refresh_playlist();
+                next_playlist_refresh = now + Duration::from_secs(2);
+            }
+            if now >= next_draw {
+                dirty |= self.should_redraw_progress();
+                next_draw = now + Duration::from_secs(1);
             }
         }
         Ok(())
@@ -146,7 +168,7 @@ impl App {
                     "time ".cyan().bold(),
                     Span::raw(format!(
                         "{} / {}   ",
-                        time::format_time(status.position_secs),
+                        time::format_time(self.display_position_secs(status)),
                         duration
                     )),
                     "volume ".cyan().bold(),
@@ -182,7 +204,10 @@ impl App {
                 status
                     .duration_secs
                     .filter(|duration| *duration > 0)
-                    .map(|duration| (status.position_secs as f64 / duration as f64).clamp(0.0, 1.0))
+                    .map(|duration| {
+                        (self.display_position_secs(status) as f64 / duration as f64)
+                            .clamp(0.0, 1.0)
+                    })
             })
             .unwrap_or(0.0);
         frame.render_widget(
@@ -278,13 +303,13 @@ impl App {
                 "[space] pause | [n/p] next/prev | [/] search | [l] later | [c] create | [o] playlists | [s] mode | [q] quit"
             }
             UiMode::Normal => {
-                "[space] pause | [n/p] next/prev | [/] search | [a/d] add/remove | [l] later | [c] create | [o] playlists | [s] mode | [q] quit"
+                "[space] pause | [n/p] next/prev | [/] search | [a/r] add/remove | [l] later | [c] create | [o] playlists | [s] mode | [q] quit"
             }
             UiMode::SearchPlay => {
                 "search: type to filter, [enter] play, [tab] later"
             }
             UiMode::PlaylistSelect => {
-                "playlists: type to filter, [up/down C-j/C-k] move, [enter] load, [d] delete"
+                "playlists: type to filter, [up/down C-j/C-k] move, [enter] load, [d] delete/confirm"
             }
             UiMode::AddSelect => {
                 "add: type to filter, [up/down C-j/C-k] move, [space] mark, [enter] save"
@@ -371,7 +396,7 @@ impl App {
             KeyCode::Char('c') => self.enter_mode(UiMode::CreateSelect),
             KeyCode::Char('o') => self.enter_mode(UiMode::PlaylistSelect),
             KeyCode::Char('a') if !self.is_all_playlist() => self.enter_mode(UiMode::AddSelect),
-            KeyCode::Char('d') if !self.is_all_playlist() => self.enter_mode(UiMode::RemoveSelect),
+            KeyCode::Char('r') if !self.is_all_playlist() => self.enter_mode(UiMode::RemoveSelect),
             _ => {}
         }
         Ok(false)
@@ -423,11 +448,13 @@ impl App {
         match key.code {
             KeyCode::Esc => self.enter_mode(UiMode::Normal),
             KeyCode::Backspace => {
+                self.pending_delete_playlist = None;
                 self.message.clear();
                 self.input.pop();
                 self.playlist_selected = 0;
             }
             KeyCode::Enter => {
+                self.pending_delete_playlist = None;
                 if let Some(name) = self.selected_playlist_name() {
                     self.load_playlist(name);
                     self.enter_mode(UiMode::Normal);
@@ -435,11 +462,24 @@ impl App {
                 }
             }
             KeyCode::Char('d') => self.delete_selected_playlist(),
-            KeyCode::Down => self.move_playlist_selection(1),
-            KeyCode::Up => self.move_playlist_selection(-1),
-            KeyCode::Char('j') | KeyCode::Char('n') if ctrl => self.move_playlist_selection(1),
-            KeyCode::Char('k') | KeyCode::Char('p') if ctrl => self.move_playlist_selection(-1),
+            KeyCode::Down => {
+                self.pending_delete_playlist = None;
+                self.move_playlist_selection(1);
+            }
+            KeyCode::Up => {
+                self.pending_delete_playlist = None;
+                self.move_playlist_selection(-1);
+            }
+            KeyCode::Char('j') | KeyCode::Char('n') if ctrl => {
+                self.pending_delete_playlist = None;
+                self.move_playlist_selection(1);
+            }
+            KeyCode::Char('k') | KeyCode::Char('p') if ctrl => {
+                self.pending_delete_playlist = None;
+                self.move_playlist_selection(-1);
+            }
             KeyCode::Char(c) => {
+                self.pending_delete_playlist = None;
                 self.message.clear();
                 self.input.push(c);
                 self.playlist_selected = 0;
@@ -638,10 +678,18 @@ impl App {
             return;
         };
         if name == self.cfg.default_playlist {
+            self.pending_delete_playlist = None;
             self.message = "All cannot be deleted".to_string();
             return;
         }
 
+        if self.pending_delete_playlist.as_deref() != Some(name.as_str()) {
+            self.pending_delete_playlist = Some(name.clone());
+            self.message = format!("press d again to delete {}", name);
+            return;
+        }
+
+        self.pending_delete_playlist = None;
         let path = playlist::playlist_path(&self.cfg, &name);
         match fs::remove_file(&path) {
             Ok(()) => {
@@ -662,36 +710,66 @@ impl App {
         self.refresh_playlist();
     }
 
-    fn refresh_status(&mut self) {
+    fn refresh_status(&mut self) -> bool {
         match ipc::send(&self.cfg.socket_path, &Request::GetStatus) {
-            Ok(Response::Ok(ResponseData::Status(status))) => self.status = Some(status),
-            Ok(Response::Err { message }) => self.message = message,
-            Err(err) => self.message = err.to_string(),
-            _ => {}
+            Ok(Response::Ok(ResponseData::Status(status))) => {
+                let changed = self.status.as_ref() != Some(&status);
+                self.status = Some(status);
+                self.status_updated_at = Some(Instant::now());
+                changed
+            }
+            Ok(Response::Err { message }) => {
+                let changed = self.message != message;
+                self.message = message;
+                changed
+            }
+            Err(err) => {
+                let message = err.to_string();
+                let changed = self.message != message;
+                self.message = message;
+                changed
+            }
+            _ => false,
         }
     }
 
-    fn refresh_playlist(&mut self) {
+    fn refresh_playlist(&mut self) -> bool {
         if let Ok(Response::Ok(ResponseData::Playlist(playlist))) =
             ipc::send(&self.cfg.socket_path, &Request::GetPlaylist)
         {
             if self.playlist != playlist {
                 self.playlist = playlist;
                 self.rebuild_visible();
+                return true;
             }
         }
+        false
     }
 
-    fn refresh_playlists(&mut self) {
+    fn refresh_playlists(&mut self) -> bool {
         match playlist::list_names(&self.cfg) {
             Ok(names) => {
+                let changed = self.playlists != names;
                 self.playlists = names;
                 let visible_len = self.visible_playlists().len();
                 if self.playlist_selected >= visible_len {
                     self.playlist_selected = visible_len.saturating_sub(1);
                 }
+                if self
+                    .pending_delete_playlist
+                    .as_ref()
+                    .is_some_and(|name| !self.playlists.contains(name))
+                {
+                    self.pending_delete_playlist = None;
+                }
+                changed
             }
-            Err(err) => self.message = err.to_string(),
+            Err(err) => {
+                let message = err.to_string();
+                let changed = self.message != message;
+                self.message = message;
+                changed
+            }
         }
     }
 
@@ -699,6 +777,7 @@ impl App {
         self.mode = mode;
         self.input.clear();
         self.message.clear();
+        self.pending_delete_playlist = None;
         self.selected = 0;
         if mode == UiMode::PlaylistSelect {
             self.refresh_playlists();
@@ -778,6 +857,27 @@ impl App {
         if let Some(status) = &mut self.status {
             status.mode = next;
         }
+    }
+
+    fn display_position_secs(&self, status: &Status) -> u64 {
+        if status.paused || status.current_track.is_none() {
+            return status.position_secs;
+        }
+        let elapsed = self
+            .status_updated_at
+            .map(|updated_at| updated_at.elapsed().as_secs())
+            .unwrap_or(0);
+        let position = status.position_secs.saturating_add(elapsed);
+        status
+            .duration_secs
+            .map(|duration| position.min(duration))
+            .unwrap_or(position)
+    }
+
+    fn should_redraw_progress(&self) -> bool {
+        self.status
+            .as_ref()
+            .is_some_and(|status| !status.paused && status.current_track.is_some())
     }
 
     fn selected_value(&self) -> Option<String> {
