@@ -1,12 +1,14 @@
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
 use std::io::{self, Write};
-use std::process::{Command, Stdio};
 use usic::config::{Config, PlayMode};
 use usic::fuzzy;
 use usic::ipc::{self, Request, Response, ResponseData, SeekTarget};
 use usic::library;
+use usic::server;
+use usic::server_control;
 use usic::time;
+use usic::tui;
 
 #[derive(Debug, Parser)]
 #[command(version, about = "A minimal local music player")]
@@ -41,6 +43,8 @@ enum CommandKind {
     },
     Tui,
     Status,
+    #[command(name = "__server", hide = true)]
+    InternalServer,
 }
 
 #[derive(Debug, Subcommand)]
@@ -75,58 +79,56 @@ fn main() -> Result<()> {
     match cli.command {
         CommandKind::Server { command } => handle_server(&cfg, command),
         CommandKind::Play { query } => handle_play(&cfg, query),
-        CommandKind::Pause => send_and_print(&cfg, Request::TogglePause),
-        CommandKind::Next => send_and_print(&cfg, Request::Next),
-        CommandKind::Prev => send_and_print(&cfg, Request::Prev),
+        CommandKind::Pause => send_and_print(&cfg, Request::TogglePause, true),
+        CommandKind::Next => send_and_print(&cfg, Request::Next, true),
+        CommandKind::Prev => send_and_print(&cfg, Request::Prev, true),
         CommandKind::Later { query } => handle_later(&cfg, query),
         CommandKind::Seek { target } => send_and_print(
             &cfg,
             Request::Seek {
                 target: parse_seek(&target)?,
             },
+            true,
         ),
         CommandKind::Volume { value } => handle_volume(&cfg, &value),
-        CommandKind::Mode { mode } => send_and_print(&cfg, Request::SetMode { mode: mode.into() }),
-        CommandKind::Tui => run_tui(),
-        CommandKind::Status => send_and_print(&cfg, Request::GetStatus),
+        CommandKind::Mode { mode } => {
+            send_and_print(&cfg, Request::SetMode { mode: mode.into() }, true)
+        }
+        CommandKind::Tui => {
+            server_control::ensure_server_running(&cfg)?;
+            tui::run()
+        }
+        CommandKind::Status => send_and_print(&cfg, Request::GetStatus, true),
+        CommandKind::InternalServer => server::run(),
     }
 }
 
 fn handle_server(cfg: &Config, command: ServerCommand) -> Result<()> {
     match command {
         ServerCommand::Start => {
-            if cfg.socket_path.exists()
-                && std::os::unix::net::UnixStream::connect(&cfg.socket_path).is_ok()
-            {
+            if server_control::start_server(cfg)? {
+                println!("server started");
+            } else {
                 println!("server already running");
-                return Ok(());
             }
-            let mut exe = std::env::current_exe()?;
-            exe.set_file_name("usic-server");
-            Command::new(exe)
-                .stdin(Stdio::null())
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .spawn()
-                .context("failed to start usic-server")?;
-            println!("server started");
             Ok(())
         }
-        ServerCommand::Stop => send_and_print(cfg, Request::Quit),
-        ServerCommand::Status => send_and_print(cfg, Request::GetStatus),
+        ServerCommand::Stop => send_and_print(cfg, Request::Quit, false),
+        ServerCommand::Status => send_and_print(cfg, Request::GetStatus, false),
     }
 }
 
 fn handle_volume(cfg: &Config, value: &str) -> Result<()> {
     match value {
-        "up" => send_and_print(cfg, Request::VolumeUp),
-        "down" => send_and_print(cfg, Request::VolumeDown),
-        "mute" => send_and_print(cfg, Request::ToggleMute),
+        "up" => send_and_print(cfg, Request::VolumeUp, true),
+        "down" => send_and_print(cfg, Request::VolumeDown, true),
+        "mute" => send_and_print(cfg, Request::ToggleMute, true),
         value => send_and_print(
             cfg,
             Request::SetVolume {
                 value: value.parse()?,
             },
+            true,
         ),
     }
 }
@@ -134,13 +136,13 @@ fn handle_volume(cfg: &Config, value: &str) -> Result<()> {
 fn handle_play(cfg: &Config, query: Option<String>) -> Result<()> {
     let tracks = library::scan(cfg)?;
     let track = choose_track(query, &tracks)?;
-    send_and_print(cfg, Request::Play { track: Some(track) })
+    send_and_print(cfg, Request::Play { track: Some(track) }, true)
 }
 
 fn handle_later(cfg: &Config, query: Option<String>) -> Result<()> {
     let tracks = library::scan(cfg)?;
     let track = choose_track(query, &tracks)?;
-    send_and_print(cfg, Request::PlayLater { track })
+    send_and_print(cfg, Request::PlayLater { track }, true)
 }
 
 fn choose_track(query: Option<String>, tracks: &[String]) -> Result<String> {
@@ -195,7 +197,10 @@ fn parse_seek(value: &str) -> Result<SeekTarget> {
     })
 }
 
-fn send_and_print(cfg: &Config, request: Request) -> Result<()> {
+fn send_and_print(cfg: &Config, request: Request, auto_start: bool) -> Result<()> {
+    if auto_start {
+        server_control::ensure_server_running(cfg)?;
+    }
     match ipc::send(&cfg.socket_path, &request)? {
         Response::Ok(ResponseData::Empty) => Ok(()),
         Response::Ok(ResponseData::Message(message)) => {
@@ -235,16 +240,4 @@ fn send_and_print(cfg: &Config, request: Request) -> Result<()> {
         }
         Response::Err { message } => bail!(message),
     }
-}
-
-fn run_tui() -> Result<()> {
-    let mut exe = std::env::current_exe()?;
-    exe.set_file_name("usic-tui");
-    let status = Command::new(exe)
-        .status()
-        .context("failed to start usic-tui")?;
-    if !status.success() {
-        bail!("usic-tui exited with {status}");
-    }
-    Ok(())
 }

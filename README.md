@@ -2,7 +2,7 @@
 
 A minimal local command-line music player written in Rust.
 
-`usic-server` owns playback and state. `usic` and `usic-tui` are clients that send commands to the server over a Unix domain socket.
+`usic` owns the CLI, TUI, and background playback server. Client commands send requests to the server over a Unix domain socket and start it automatically when needed.
 
 ## Requirements
 
@@ -12,9 +12,8 @@ A minimal local command-line music player written in Rust.
 ## Setup
 
 ```bash
-cargo build
-cargo install --path .
-usic server start
+make install
+usic tui
 ```
 
 On first run, usic creates:
@@ -47,13 +46,15 @@ usic tui
 
 `play` and `later` use fuzzy matching against the local music library. If `query` is omitted, the CLI prompts for one.
 
+Client commands start the background server automatically when it is not already running. `usic server start` is still available for explicit daemon management and is safe to run repeatedly.
+
 Playlist files are managed from the TUI and stored as plain text files in `music_dir/playlists`, one track per line. Tracks are stored as paths relative to `music_dir`. `All` is a virtual playlist backed by scanning `music_dir`.
 
 ## macOS Media Controls
 
-On macOS, Cargo builds a small Swift sidecar named `usic-macos-media` next to `usic-server`. `usic-server` starts it automatically, and the sidecar registers with the system media remote command center. AirPods and system media controls can send play, pause, toggle pause, next, and previous commands to the server. AirPods volume gestures are handled by macOS as output-device volume and are not mirrored into usic's app-level volume setting.
+On macOS, Cargo builds a small Swift sidecar named `usic-macos-media` next to `usic`. The background server starts it automatically, and the sidecar registers with the system media remote command center. AirPods and system media controls can send play, pause, toggle pause, next, and previous commands to the server. AirPods volume gestures are handled by macOS as output-device volume and are not mirrored into usic's app-level volume setting.
 
-`cargo install --path .` installs the Rust binaries only. For macOS media controls after installation, put `usic-macos-media` next to `usic-server` or somewhere in `PATH`.
+Use `make install` instead of `cargo install --path .` if you want macOS media controls. `cargo install` installs Cargo package binaries only, while `make install` also installs the Swift sidecar to the same `bin` directory. The default install prefix is `~/.cargo`; override it with `make install PREFIX=/usr/local`.
 
 ## TUI
 

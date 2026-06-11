@@ -1,3 +1,7 @@
+use crate::config::{Config, PlayMode};
+use crate::ipc::{self, Request, Response, ResponseData, SeekTarget, Status};
+use crate::library;
+use crate::playlist::Playlist;
 use anyhow::{bail, Context, Result};
 use rand::seq::SliceRandom;
 use rodio::{Decoder, OutputStream, OutputStreamBuilder, Sink, Source};
@@ -10,18 +14,14 @@ use std::process::{Child, Command, Stdio};
 use std::sync::mpsc::{self, Sender};
 use std::sync::Arc;
 use std::time::Duration;
-use usic::config::{Config, PlayMode};
-use usic::ipc::{self, Request, Response, ResponseData, SeekTarget, Status};
-use usic::library;
-use usic::playlist::Playlist;
 
-fn main() -> Result<()> {
+pub fn run() -> Result<()> {
     let cfg = Config::load_or_create()?;
     cfg.ensure_dirs()?;
-    run(cfg)
+    run_server(cfg)
 }
 
-fn run(cfg: Config) -> Result<()> {
+fn run_server(cfg: Config) -> Result<()> {
     bind_guard(&cfg.socket_path)?;
     let listener = UnixListener::bind(&cfg.socket_path)
         .with_context(|| format!("failed to bind {}", cfg.socket_path.display()))?;
@@ -30,22 +30,28 @@ fn run(cfg: Config) -> Result<()> {
     let _macos_media = start_macos_media_bridge(&cfg.socket_path);
 
     let mut player = Player::new(cfg.clone(), event_tx)?;
-    eprintln!("usic-server listening on {}", cfg.socket_path.display());
+    eprintln!("usic server listening on {}", cfg.socket_path.display());
 
     let mut quitting = false;
     while !quitting {
         match event_rx.recv().context("server event channel closed")? {
-            ServerEvent::Client(stream) => {
-                let response =
-                    match read_request(&stream).and_then(|request| player.handle(request)) {
+            ServerEvent::Client(stream) => match read_request(&stream) {
+                Ok(request) => {
+                    let response = match player.handle(request) {
                         Ok((response, should_quit)) => {
                             quitting = should_quit;
                             response
                         }
                         Err(err) => ipc::err(err.to_string()),
                     };
-                write_response(stream, &response)?;
-            }
+                    if let Err(err) = write_response(stream, &response) {
+                        eprintln!("failed to write client response: {err}");
+                    }
+                }
+                Err(err) => {
+                    eprintln!("failed to read client request: {err}");
+                }
+            },
             ServerEvent::TrackFinished(token) => {
                 player.advance_if_finished(token);
             }
@@ -89,6 +95,9 @@ fn read_request(stream: &UnixStream) -> Result<Request> {
     let mut line = String::new();
     let mut reader = BufReader::new(stream);
     reader.read_line(&mut line)?;
+    if line.is_empty() {
+        bail!("client disconnected before sending a request");
+    }
     serde_json::from_str(line.trim_end()).context("failed to parse request")
 }
 
@@ -447,7 +456,23 @@ fn build_play_order(tracks: &[String], mode: PlayMode) -> Vec<String> {
 }
 
 #[cfg(target_os = "macos")]
-fn start_macos_media_bridge(socket_path: &Path) -> Option<Child> {
+struct MacosMediaBridge {
+    child: Child,
+}
+
+#[cfg(target_os = "macos")]
+impl Drop for MacosMediaBridge {
+    fn drop(&mut self) {
+        if matches!(self.child.try_wait(), Ok(Some(_))) {
+            return;
+        }
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn start_macos_media_bridge(socket_path: &Path) -> Option<MacosMediaBridge> {
     let helper = std::env::current_exe()
         .ok()
         .map(|path| path.with_file_name("usic-macos-media"))
@@ -463,7 +488,7 @@ fn start_macos_media_bridge(socket_path: &Path) -> Option<Child> {
         .stderr(Stdio::null())
         .spawn()
     {
-        Ok(child) => Some(child),
+        Ok(child) => Some(MacosMediaBridge { child }),
         Err(err) => {
             eprintln!("failed to start usic-macos-media: {err}");
             None

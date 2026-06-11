@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT"
 build = "build.rs"
+autobins = false
 
 [dependencies]
 anyhow = "1.0"
@@ -26,11 +27,3 @@ path = "src/lib.rs"
 [[bin]]
 name = "usic"
 path = "src/main.rs"
-
-[[bin]]
-name = "usic-server"
-path = "src/bin/usic-server.rs"
-
-[[bin]]
-name = "usic-tui"
-path = "src/bin/usic-tui.rs"

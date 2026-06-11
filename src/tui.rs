@@ -1,3 +1,10 @@
+use crate::config::{Config, PlayMode};
+use crate::fuzzy;
+use crate::ipc::{self, Request, Response, ResponseData, SeekTarget, Status};
+use crate::library;
+use crate::playlist::{self, Playlist};
+use crate::server_control;
+use crate::time;
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::layout::{Constraint, Direction, Layout};
@@ -8,20 +15,15 @@ use ratatui::Frame;
 use std::collections::BTreeSet;
 use std::fs;
 use std::time::{Duration, Instant};
-use usic::config::{Config, PlayMode};
-use usic::fuzzy;
-use usic::ipc::{self, Request, Response, ResponseData, SeekTarget, Status};
-use usic::library;
-use usic::playlist::{self, Playlist};
-use usic::time;
 
-fn main() -> Result<()> {
+pub fn run() -> Result<()> {
     if std::env::args().any(|arg| arg == "--help" || arg == "-h") {
-        println!("Usage: usic-tui\n\nTerminal client for usic-server.");
+        println!("Usage: usic tui\n\nTerminal client for usic.");
         return Ok(());
     }
     let cfg = Config::load_or_create()?;
     cfg.ensure_dirs()?;
+    server_control::ensure_server_running(&cfg)?;
     let terminal = ratatui::init();
     let result = App::new(cfg)?.run(terminal);
     ratatui::restore();

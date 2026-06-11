@@ -16,12 +16,15 @@ fn main() {
 
     let source = PathBuf::from("macos/usic-macos-media/main.swift");
     let output = target_dir.join("usic-macos-media");
+    let module_cache = target_dir.join("swift-module-cache");
     let status = Command::new("swiftc")
         .arg(&source)
         .arg("-framework")
         .arg("Foundation")
         .arg("-framework")
         .arg("MediaPlayer")
+        .arg("-module-cache-path")
+        .arg(&module_cache)
         .arg("-o")
         .arg(&output)
         .status();

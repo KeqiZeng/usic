@@ -3,4 +3,7 @@ pub mod fuzzy;
 pub mod ipc;
 pub mod library;
 pub mod playlist;
+pub mod server;
+pub mod server_control;
 pub mod time;
+pub mod tui;
