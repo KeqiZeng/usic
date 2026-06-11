@@ -33,6 +33,7 @@ struct App {
     status: Option<Status>,
     status_updated_at: Option<Instant>,
     playlist: Vec<String>,
+    queue: Vec<String>,
     playlists: Vec<String>,
     library: Vec<String>,
     visible: Vec<VisibleItem>,
@@ -45,6 +46,7 @@ struct App {
     input: String,
     message: String,
     pending_delete_playlist: Option<String>,
+    pending_queue_top: bool,
 }
 
 #[derive(Clone)]
@@ -72,6 +74,7 @@ impl App {
             status: None,
             status_updated_at: None,
             playlist: Vec::new(),
+            queue: Vec::new(),
             playlists: Vec::new(),
             visible: Vec::new(),
             list_state: ListState::default(),
@@ -83,6 +86,7 @@ impl App {
             input: String::new(),
             message: String::new(),
             pending_delete_playlist: None,
+            pending_queue_top: false,
         };
         app.rebuild_visible();
         Ok(app)
@@ -126,7 +130,7 @@ impl App {
             }
             if now >= next_playlist_refresh {
                 dirty |= self.refresh_playlists();
-                dirty |= self.refresh_playlist();
+                dirty |= self.refresh_queue();
                 next_playlist_refresh = now + Duration::from_secs(2);
             }
             if now >= next_draw {
@@ -292,7 +296,7 @@ impl App {
                 UiMode::RemoveSelect => "Remove Tracks",
                 UiMode::CreateSelect => "Create Playlist",
                 UiMode::CreatePlaylistName => "Selected Tracks",
-                UiMode::Normal => "Playlist",
+                UiMode::Normal => "Queue",
             })),
             chunks[3],
             &mut self.list_state,
@@ -300,10 +304,10 @@ impl App {
 
         let prompt = match self.mode {
             UiMode::Normal if self.is_all_playlist() => {
-                "[space] pause | [n/p] next/prev | [/] search | [l] later | [c] create | [o] playlists | [s] mode | [q] quit"
+                "[space] pause | [n/p] next/prev | [gg/G] top/bottom | [/] search | [l] later | [c] create | [o] playlists | [s] mode | [q] quit"
             }
             UiMode::Normal => {
-                "[space] pause | [n/p] next/prev | [/] search | [a/r] add/remove | [l] later | [c] create | [o] playlists | [s] mode | [q] quit"
+                "[space] pause | [n/p] next/prev | [gg/G] top/bottom | [/] search | [a/r] add/remove | [l] later | [c] create | [o] playlists | [s] mode | [q] quit"
             }
             UiMode::SearchPlay => {
                 "search: type to filter, [enter] play, [tab] later"
@@ -365,6 +369,14 @@ impl App {
     }
 
     fn handle_normal_key(&mut self, code: KeyCode) -> Result<bool> {
+        if self.pending_queue_top {
+            self.pending_queue_top = false;
+            if code == KeyCode::Char('g') {
+                self.select_first();
+                return Ok(false);
+            }
+        }
+
         match code {
             KeyCode::Char('q') => return Ok(true),
             KeyCode::Char(' ') => self.send(Request::TogglePause),
@@ -386,6 +398,8 @@ impl App {
             KeyCode::Char('s') => self.cycle_mode(),
             KeyCode::Down | KeyCode::Char('j') => self.move_selection(1),
             KeyCode::Up | KeyCode::Char('k') => self.move_selection(-1),
+            KeyCode::Char('g') => self.pending_queue_top = true,
+            KeyCode::Char('G') => self.select_last(),
             KeyCode::Enter => {
                 if let Some(track) = self.selected_value() {
                     self.send(Request::Play { track: Some(track) });
@@ -623,9 +637,14 @@ impl App {
 
     fn send(&mut self, request: Request) {
         let refresh_status = !matches!(request, Request::Quit);
-        let refresh_playlist = matches!(
+        let refresh_queue = matches!(
             request,
-            Request::LoadPlaylist { .. } | Request::PlayLater { .. }
+            Request::Play { .. }
+                | Request::Next
+                | Request::Prev
+                | Request::PlayLater { .. }
+                | Request::SetMode { .. }
+                | Request::LoadPlaylist { .. }
         );
         match ipc::send(&self.cfg.socket_path, &request) {
             Ok(Response::Ok(ResponseData::Message(message))) => {
@@ -633,8 +652,8 @@ impl App {
                 if refresh_status {
                     self.refresh_status();
                 }
-                if refresh_playlist {
-                    self.refresh_playlist();
+                if refresh_queue {
+                    self.refresh_queue();
                 }
             }
             Ok(Response::Ok(_)) => {
@@ -642,8 +661,8 @@ impl App {
                 if refresh_status {
                     self.refresh_status();
                 }
-                if refresh_playlist {
-                    self.refresh_playlist();
+                if refresh_queue {
+                    self.refresh_queue();
                 }
             }
             Ok(Response::Err { message }) => self.message = message,
@@ -707,7 +726,7 @@ impl App {
     fn refresh(&mut self) {
         self.refresh_status();
         self.refresh_playlists();
-        self.refresh_playlist();
+        self.refresh_queue();
     }
 
     fn refresh_status(&mut self) -> bool {
@@ -733,17 +752,35 @@ impl App {
         }
     }
 
-    fn refresh_playlist(&mut self) -> bool {
-        if let Ok(Response::Ok(ResponseData::Playlist(playlist))) =
+    fn refresh_queue(&mut self) -> bool {
+        if let Ok(Response::Ok(ResponseData::Playlist(queue))) =
             ipc::send(&self.cfg.socket_path, &Request::GetPlaylist)
         {
-            if self.playlist != playlist {
-                self.playlist = playlist;
+            if self.queue != queue {
+                self.queue = queue;
                 self.rebuild_visible();
                 return true;
             }
         }
         false
+    }
+
+    fn refresh_current_playlist(&mut self) -> bool {
+        match self.current_playlist_tracks() {
+            Ok(playlist) => {
+                if self.playlist != playlist {
+                    self.playlist = playlist;
+                    return true;
+                }
+                false
+            }
+            Err(err) => {
+                let message = err.to_string();
+                let changed = self.message != message;
+                self.message = message;
+                changed
+            }
+        }
     }
 
     fn refresh_playlists(&mut self) -> bool {
@@ -778,6 +815,7 @@ impl App {
         self.input.clear();
         self.message.clear();
         self.pending_delete_playlist = None;
+        self.pending_queue_top = false;
         self.selected = 0;
         if mode == UiMode::PlaylistSelect {
             self.refresh_playlists();
@@ -788,6 +826,7 @@ impl App {
             UiMode::AddSelect | UiMode::RemoveSelect | UiMode::CreateSelect
         ) {
             self.marked.clear();
+            self.refresh_current_playlist();
         }
         self.rebuild_visible();
     }
@@ -820,7 +859,7 @@ impl App {
                 .map(ToOwned::to_owned)
                 .collect(),
             UiMode::CreatePlaylistName => self.marked.iter().cloned().collect(),
-            UiMode::Normal | UiMode::PlaylistSelect => self.playlist.clone(),
+            UiMode::Normal | UiMode::PlaylistSelect => self.queue.clone(),
         };
 
         self.visible = values
@@ -896,6 +935,21 @@ impl App {
         self.current_playlist_name().as_deref() == Some(self.cfg.default_playlist.as_str())
     }
 
+    fn current_playlist_tracks(&self) -> Result<Vec<String>> {
+        let name = self
+            .current_playlist_name()
+            .unwrap_or_else(|| self.cfg.default_playlist.clone());
+        if name == self.cfg.default_playlist {
+            return Ok(self.library.clone());
+        }
+
+        let mut playlist = Playlist::load(&self.cfg, &name)?;
+        playlist
+            .tracks
+            .retain(|track| library::resolve_track(&self.cfg, track).is_file());
+        Ok(playlist.tracks)
+    }
+
     fn selected_playlist_name(&self) -> Option<String> {
         self.visible_playlists()
             .get(self.playlist_selected)
@@ -919,8 +973,22 @@ impl App {
             return;
         }
         let current = self.selected as isize;
-        self.selected = (current + delta).rem_euclid(self.visible.len() as isize) as usize;
+        self.selected = (current + delta).clamp(0, self.visible.len() as isize - 1) as usize;
         self.list_state.select(Some(self.selected));
+    }
+
+    fn select_first(&mut self) {
+        if !self.visible.is_empty() {
+            self.selected = 0;
+            self.list_state.select(Some(self.selected));
+        }
+    }
+
+    fn select_last(&mut self) {
+        if !self.visible.is_empty() {
+            self.selected = self.visible.len() - 1;
+            self.list_state.select(Some(self.selected));
+        }
     }
 
     fn move_playlist_selection(&mut self, delta: isize) {
@@ -930,7 +998,7 @@ impl App {
             return;
         }
         let current = self.playlist_selected as isize;
-        self.playlist_selected = (current + delta).rem_euclid(len as isize) as usize;
+        self.playlist_selected = (current + delta).clamp(0, len as isize - 1) as usize;
         self.playlist_state.select(Some(self.playlist_selected));
     }
 

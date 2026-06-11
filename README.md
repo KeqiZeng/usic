@@ -63,13 +63,14 @@ Common keys:
 
 - `space`: pause/resume
 - `n` / `p`: next/previous
-- `j` / `k`: move down/up in the playlist
+- `j` / `k`: move down/up in the queue
+- `gg` / `G`: jump to the top/bottom of the queue
 - `left` / `right`: seek backward/forward
 - `+` / `-`: volume up/down
 - `m`: mute
 - `s`: cycle play mode
 - `/`: search tracks; `enter` plays the selected result, `tab` queues it for later
-- `l`: queue the selected playlist track for later
+- `l`: queue the selected track for later
 - `o`: focus playlists
 - `c`: create a playlist from selected tracks
 - `a` / `r`: multi-select tracks and add/remove them from a playlist

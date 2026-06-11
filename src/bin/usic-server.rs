@@ -1,5 +1,5 @@
 use anyhow::{bail, Context, Result};
-use rand::Rng;
+use rand::seq::SliceRandom;
 use rodio::{Decoder, OutputStream, OutputStreamBuilder, Sink, Source};
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader, Write};
@@ -105,7 +105,8 @@ struct Player {
     _stream: OutputStream,
     sink: Arc<Sink>,
     playlist: Playlist,
-    current_index: Option<usize>,
+    play_order: Vec<String>,
+    current_order_index: Option<usize>,
     current_track: Option<String>,
     current_duration: Option<u64>,
     playback_token: u64,
@@ -121,6 +122,7 @@ impl Player {
             .context("failed to open default audio output")?;
         let sink = Arc::new(Sink::connect_new(stream.mixer()));
         let playlist = load_runtime_playlist(&cfg, &cfg.default_playlist, true)?;
+        let play_order = build_play_order(&playlist.tracks, cfg.default_mode);
         sink.set_volume(1.0);
         Ok(Self {
             cfg: cfg.clone(),
@@ -128,7 +130,8 @@ impl Player {
             _stream: stream,
             sink,
             playlist,
-            current_index: None,
+            play_order,
+            current_order_index: None,
             current_track: None,
             current_duration: None,
             playback_token: 0,
@@ -187,18 +190,17 @@ impl Player {
             }
             Request::SetMode { mode } => {
                 self.mode = mode;
+                self.rebuild_play_order();
                 ipc::ok_empty()
             }
             Request::LoadPlaylist { name } => {
                 self.playlist =
                     load_runtime_playlist(&self.cfg, &name, name == self.cfg.default_playlist)?;
-                self.current_index = None;
+                self.rebuild_play_order();
                 ipc::ok_empty()
             }
             Request::GetStatus => Response::Ok(ResponseData::Status(self.status())),
-            Request::GetPlaylist => {
-                Response::Ok(ResponseData::Playlist(self.playlist.tracks.clone()))
-            }
+            Request::GetPlaylist => Response::Ok(ResponseData::Playlist(self.queue_view())),
             Request::Quit => return Ok((ipc::ok_message("server quit successfully"), true)),
         };
         Ok((response, false))
@@ -208,9 +210,9 @@ impl Player {
         let track = match track {
             Some(track) => track,
             None => self
-                .current_index
-                .and_then(|idx| self.playlist.tracks.get(idx).cloned())
-                .or_else(|| self.playlist.tracks.first().cloned())
+                .current_order_index
+                .and_then(|idx| self.play_order.get(idx).cloned())
+                .or_else(|| self.play_order.first().cloned())
                 .context("playlist is empty")?,
         };
         self.play_track(track)
@@ -232,53 +234,58 @@ impl Player {
         self.sink.append(source);
         self.playback_token = self.playback_token.wrapping_add(1);
         self.spawn_completion_waiter(self.playback_token);
-        self.current_index = self
-            .playlist
-            .tracks
-            .iter()
-            .position(|candidate| candidate == &track);
+        self.current_order_index = self.ensure_in_play_order(&track);
         self.current_track = Some(track);
         Ok(())
     }
 
     fn play_next(&mut self) -> Result<()> {
         let Some(index) = self.next_index() else {
-            bail!("playlist is empty");
+            bail!("queue is empty");
         };
-        let track = self.playlist.tracks[index].clone();
-        self.current_index = Some(index);
+        let track = self.play_order[index].clone();
+        self.current_order_index = Some(index);
         self.play_track(track)
     }
 
     fn play_prev(&mut self) -> Result<()> {
-        if self.playlist.tracks.is_empty() {
-            bail!("playlist is empty");
+        if self.play_order.is_empty() {
+            bail!("queue is empty");
         }
-        let index = match self.current_index {
-            Some(0) | None => self.playlist.tracks.len() - 1,
+        let index = match self.current_order_index {
+            Some(0) | None => self.play_order.len() - 1,
             Some(index) => index - 1,
         };
-        let track = self.playlist.tracks[index].clone();
-        self.current_index = Some(index);
+        let track = self.play_order[index].clone();
+        self.current_order_index = Some(index);
         self.play_track(track)
     }
 
     fn play_later(&mut self, track: String) {
-        let insert_at = self
-            .current_index
-            .map(|idx| idx + 1)
-            .unwrap_or(self.playlist.tracks.len());
+        if self.current_track.as_deref() == Some(track.as_str()) {
+            return;
+        }
+
+        let mut current = self.current_order_index;
         if let Some(existing) = self
-            .playlist
-            .tracks
+            .play_order
             .iter()
             .position(|candidate| candidate == &track)
         {
-            self.playlist.tracks.remove(existing);
+            self.play_order.remove(existing);
+            if let Some(index) = current {
+                if existing < index {
+                    current = Some(index - 1);
+                }
+            }
         }
-        self.playlist
-            .tracks
-            .insert(insert_at.min(self.playlist.tracks.len()), track);
+
+        let insert_at = current
+            .map(|idx| idx + 1)
+            .unwrap_or(self.play_order.len())
+            .min(self.play_order.len());
+        self.play_order.insert(insert_at, track);
+        self.current_order_index = current;
     }
 
     fn seek(&mut self, target: SeekTarget) -> Result<()> {
@@ -350,18 +357,70 @@ impl Player {
     }
 
     fn next_index(&self) -> Option<usize> {
-        if self.playlist.tracks.is_empty() {
+        if self.play_order.is_empty() {
             return None;
         }
         match self.mode {
-            PlayMode::Single => Some(self.current_index.unwrap_or(0)),
+            PlayMode::Single => Some(self.current_order_index.unwrap_or(0)),
             PlayMode::Sequence => Some(
-                self.current_index
-                    .map(|idx| (idx + 1) % self.playlist.tracks.len())
+                self.current_order_index
+                    .map(|idx| (idx + 1) % self.play_order.len())
                     .unwrap_or(0),
             ),
-            PlayMode::Shuffle => Some(rand::thread_rng().gen_range(0..self.playlist.tracks.len())),
+            PlayMode::Shuffle => Some(
+                self.current_order_index
+                    .map(|idx| (idx + 1) % self.play_order.len())
+                    .unwrap_or(0),
+            ),
         }
+    }
+
+    fn rebuild_play_order(&mut self) {
+        self.play_order = build_play_order(&self.playlist.tracks, self.mode);
+        self.current_order_index = self.current_track.as_ref().and_then(|track| {
+            self.play_order
+                .iter()
+                .position(|candidate| candidate == track)
+        });
+        if self.current_order_index.is_none() {
+            if let Some(track) = &self.current_track {
+                self.play_order.insert(0, track.clone());
+                self.current_order_index = Some(0);
+            }
+        }
+    }
+
+    fn ensure_in_play_order(&mut self, track: &str) -> Option<usize> {
+        if let Some(index) = self
+            .play_order
+            .iter()
+            .position(|candidate| candidate == track)
+        {
+            return Some(index);
+        }
+
+        let insert_at = self
+            .current_order_index
+            .map(|idx| idx + 1)
+            .unwrap_or(self.play_order.len())
+            .min(self.play_order.len());
+        self.play_order.insert(insert_at, track.to_string());
+        Some(insert_at)
+    }
+
+    fn queue_view(&self) -> Vec<String> {
+        let Some(index) = self
+            .current_order_index
+            .filter(|index| *index < self.play_order.len())
+        else {
+            return self.play_order.clone();
+        };
+
+        self.play_order[index..]
+            .iter()
+            .chain(self.play_order[..index].iter())
+            .cloned()
+            .collect()
     }
 
     fn status(&self) -> Status {
@@ -374,9 +433,17 @@ impl Player {
             paused: self.paused,
             mode: self.mode,
             playlist_name: Some(self.playlist.name.clone()),
-            queue_len: self.playlist.tracks.len(),
+            queue_len: self.play_order.len(),
         }
     }
+}
+
+fn build_play_order(tracks: &[String], mode: PlayMode) -> Vec<String> {
+    let mut order = tracks.to_vec();
+    if mode == PlayMode::Shuffle {
+        order.shuffle(&mut rand::thread_rng());
+    }
+    order
 }
 
 #[cfg(target_os = "macos")]
