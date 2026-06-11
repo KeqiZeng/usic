@@ -1,3 +1,5 @@
+use super::playlist::load_runtime_playlist;
+use super::ServerEvent;
 use crate::config::{Config, PlayMode};
 use crate::ipc::{self, Request, Response, ResponseData, SeekTarget, Status};
 use crate::library;
@@ -5,110 +7,12 @@ use crate::playlist::Playlist;
 use anyhow::{bail, Context, Result};
 use rand::seq::SliceRandom;
 use rodio::{Decoder, OutputStream, OutputStreamBuilder, Sink, Source};
-use std::fs::{self, File};
-use std::io::{BufRead, BufReader, Write};
-use std::os::unix::net::{UnixListener, UnixStream};
-use std::path::Path;
-#[cfg(target_os = "macos")]
-use std::process::{Child, Command, Stdio};
-use std::sync::mpsc::{self, Sender};
+use std::fs::File;
+use std::sync::mpsc::Sender;
 use std::sync::Arc;
 use std::time::Duration;
 
-pub fn run() -> Result<()> {
-    let cfg = Config::load_or_create()?;
-    cfg.ensure_dirs()?;
-    run_server(cfg)
-}
-
-fn run_server(cfg: Config) -> Result<()> {
-    bind_guard(&cfg.socket_path)?;
-    let listener = UnixListener::bind(&cfg.socket_path)
-        .with_context(|| format!("failed to bind {}", cfg.socket_path.display()))?;
-    let (event_tx, event_rx) = mpsc::channel();
-    spawn_accept_thread(listener, event_tx.clone());
-    let _macos_media = start_macos_media_bridge(&cfg.socket_path);
-
-    let mut player = Player::new(cfg.clone(), event_tx)?;
-    eprintln!("usic server listening on {}", cfg.socket_path.display());
-
-    let mut quitting = false;
-    while !quitting {
-        match event_rx.recv().context("server event channel closed")? {
-            ServerEvent::Client(stream) => match read_request(&stream) {
-                Ok(request) => {
-                    let response = match player.handle(request) {
-                        Ok((response, should_quit)) => {
-                            quitting = should_quit;
-                            response
-                        }
-                        Err(err) => ipc::err(err.to_string()),
-                    };
-                    if let Err(err) = write_response(stream, &response) {
-                        eprintln!("failed to write client response: {err}");
-                    }
-                }
-                Err(err) => {
-                    eprintln!("failed to read client request: {err}");
-                }
-            },
-            ServerEvent::TrackFinished(token) => {
-                player.advance_if_finished(token);
-            }
-        }
-    }
-
-    let _ = fs::remove_file(&cfg.socket_path);
-    Ok(())
-}
-
-enum ServerEvent {
-    Client(UnixStream),
-    TrackFinished(u64),
-}
-
-fn spawn_accept_thread(listener: UnixListener, event_tx: Sender<ServerEvent>) {
-    std::thread::spawn(move || {
-        for stream in listener.incoming() {
-            let Ok(stream) = stream else {
-                break;
-            };
-            if event_tx.send(ServerEvent::Client(stream)).is_err() {
-                break;
-            }
-        }
-    });
-}
-
-fn bind_guard(socket_path: &Path) -> Result<()> {
-    if !socket_path.exists() {
-        return Ok(());
-    }
-    if UnixStream::connect(socket_path).is_ok() {
-        bail!("server already running at {}", socket_path.display());
-    }
-    fs::remove_file(socket_path)
-        .with_context(|| format!("failed to remove stale {}", socket_path.display()))
-}
-
-fn read_request(stream: &UnixStream) -> Result<Request> {
-    let mut line = String::new();
-    let mut reader = BufReader::new(stream);
-    reader.read_line(&mut line)?;
-    if line.is_empty() {
-        bail!("client disconnected before sending a request");
-    }
-    serde_json::from_str(line.trim_end()).context("failed to parse request")
-}
-
-fn write_response(mut stream: UnixStream, response: &Response) -> Result<()> {
-    serde_json::to_writer(&mut stream, response)?;
-    stream.write_all(b"\n")?;
-    stream.flush()?;
-    Ok(())
-}
-
-struct Player {
+pub(super) struct Player {
     cfg: Config,
     event_tx: Sender<ServerEvent>,
     _stream: OutputStream,
@@ -126,7 +30,7 @@ struct Player {
 }
 
 impl Player {
-    fn new(cfg: Config, event_tx: Sender<ServerEvent>) -> Result<Self> {
+    pub(super) fn new(cfg: Config, event_tx: Sender<ServerEvent>) -> Result<Self> {
         let stream = OutputStreamBuilder::open_default_stream()
             .context("failed to open default audio output")?;
         let sink = Arc::new(Sink::connect_new(stream.mixer()));
@@ -151,7 +55,7 @@ impl Player {
         })
     }
 
-    fn handle(&mut self, request: Request) -> Result<(Response, bool)> {
+    pub(super) fn handle(&mut self, request: Request) -> Result<(Response, bool)> {
         let response = match request {
             Request::Play { track } => {
                 self.play_requested(track)?;
@@ -213,6 +117,19 @@ impl Player {
             Request::Quit => return Ok((ipc::ok_message("server quit successfully"), true)),
         };
         Ok((response, false))
+    }
+
+    pub(super) fn advance_if_finished(&mut self, token: u64) {
+        if token == self.playback_token
+            && self.current_track.is_some()
+            && !self.paused
+            && self.sink.empty()
+        {
+            if self.play_next().is_err() {
+                self.current_track = None;
+                self.current_duration = None;
+            }
+        }
     }
 
     fn play_requested(&mut self, track: Option<String>) -> Result<()> {
@@ -343,19 +260,6 @@ impl Player {
         }
     }
 
-    fn advance_if_finished(&mut self, token: u64) {
-        if token == self.playback_token
-            && self.current_track.is_some()
-            && !self.paused
-            && self.sink.empty()
-        {
-            if self.play_next().is_err() {
-                self.current_track = None;
-                self.current_duration = None;
-            }
-        }
-    }
-
     fn spawn_completion_waiter(&self, token: u64) {
         let sink = Arc::clone(&self.sink);
         let event_tx = self.event_tx.clone();
@@ -453,71 +357,4 @@ fn build_play_order(tracks: &[String], mode: PlayMode) -> Vec<String> {
         order.shuffle(&mut rand::thread_rng());
     }
     order
-}
-
-#[cfg(target_os = "macos")]
-struct MacosMediaBridge {
-    child: Child,
-}
-
-#[cfg(target_os = "macos")]
-impl Drop for MacosMediaBridge {
-    fn drop(&mut self) {
-        if matches!(self.child.try_wait(), Ok(Some(_))) {
-            return;
-        }
-        let _ = self.child.kill();
-        let _ = self.child.wait();
-    }
-}
-
-#[cfg(target_os = "macos")]
-fn start_macos_media_bridge(socket_path: &Path) -> Option<MacosMediaBridge> {
-    let helper = std::env::current_exe()
-        .ok()
-        .map(|path| path.with_file_name("usic-macos-media"))
-        .filter(|path| path.is_file());
-    let mut command = match helper {
-        Some(path) => Command::new(path),
-        None => Command::new("usic-macos-media"),
-    };
-    match command
-        .arg(socket_path)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-    {
-        Ok(child) => Some(MacosMediaBridge { child }),
-        Err(err) => {
-            eprintln!("failed to start usic-macos-media: {err}");
-            None
-        }
-    }
-}
-
-#[cfg(not(target_os = "macos"))]
-fn start_macos_media_bridge(_socket_path: &Path) -> Option<()> {
-    None
-}
-
-fn load_runtime_playlist(cfg: &Config, name: &str, rebuild_if_empty: bool) -> Result<Playlist> {
-    if name == cfg.default_playlist {
-        return Ok(Playlist {
-            name: cfg.default_playlist.clone(),
-            tracks: library::scan(cfg)?,
-        });
-    }
-
-    let mut playlist = Playlist::load(cfg, name)?;
-    let original_len = playlist.tracks.len();
-    playlist
-        .tracks
-        .retain(|track| library::resolve_track(cfg, track).is_file());
-
-    if playlist.tracks.len() != original_len && rebuild_if_empty {
-        playlist.save(cfg)?;
-    }
-
-    Ok(playlist)
 }
