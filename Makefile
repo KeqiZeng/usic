@@ -1,4 +1,5 @@
-PREFIX ?= $(HOME)/.cargo
+CARGO_HOME ?= $(HOME)/.cargo
+PREFIX ?= $(CARGO_HOME)
 BINDIR ?= $(PREFIX)/bin
 CARGO ?= cargo
 INSTALL ?= install
