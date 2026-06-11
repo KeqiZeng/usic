@@ -1,6 +1,6 @@
-build/
-music/
+/target/
+/build/
+/compile_commands.json
+.DS_Store
 .cache/
 .vscode/
-.DS_Store
-compile_commands.json

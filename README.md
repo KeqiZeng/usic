@@ -1,92 +1,85 @@
-A lightweight command-line offline music player built with [miniaudio](https://github.com/mackron/miniaudio) and modern C++.
+# usic
 
-# Features
+A minimal local command-line music player written in Rust.
 
-- Simple and fully customizable command-line interface
-- Low resource usage (both CPU and memory)
-- Support for multiple music formats (FLAC, MP3, WAV)
-- Support common music playback controls
-- Playlist management
-- Progress bar visualization
-- Volume control
-- Support multiple play modes - sequence, shuffle, single
+`usic-server` owns playback and state. `usic` and `usic-tui` are clients that send commands to the server over a Unix domain socket.
 
-# Requirements
+## Requirements
 
-`git`
+- Rust stable
+- macOS or Linux
 
-`make`
+## Setup
 
-`camke`
-
-`ninja`
-
-`C++ Compiler` that supports `C++20`
-
-`fzf`(optional)
-
-# Setup
-
-1. Clone this repository `git clone https://github.com/KeqiZeng/usic`.
-2. Change directory to `cd usic`.
-3. Set the `USIC_LIBRARY` in `src/config.h`.
-4. Put audio files (only flac, mp3 and wav are supported) to the `USIC_LIBRARY` directory you set in last step.
-5. Run the following commands to compile `usic` and install it to `/usr/local/bin`
 ```bash
-sudo make clean release install
+cargo build
+cargo install --path .
+usic server start
 ```
-6. `usic play` or `usic play "audio_filename.flac"` to play an audio file.
 
-# Commands
+On first run, usic creates:
 
-- `usic`: Start the server
+```text
+~/.config/usic/config.toml
+~/.local/state/usic/
+```
 
-The following commands require [`fzf`](https://github.com/junegunn/fzf) to be installed: 
-- `usic add_music_to_list [playlist_file]`: Fuzzy select a track in `USIC_LABRARY` using fzf and add it to the given playlist.
-- `usic fuzzy_play`: Fuzzy select a track in `USIC_LABRARY` using fzf and play it.
-- `usic fuzzy_play_later`: Fuzzy select a track in `USIC_LABRARY` using fzf and play it after the current one is over.
+Edit `config.toml` and set `music_dir` to your local music directory.
 
-The following commands require server is running:
+## Commands
 
-- `usic quit`: Quit the server
+```bash
+usic server start
+usic server stop
+usic status
 
-## Basic Playback
+usic play [query]
+usic pause
+usic next
+usic prev
+usic later [query]
+usic seek <MM:SS|+SECONDS|-SECONDS>
+usic volume <0..1|up|down|mute>
+usic mode <sequence|shuffle|single>
 
-- `usic play [audio_file]`: Play specified track (or the first one in playlist if not provided)
-- `usic pause`: Pause/Resume playback
-- `usic play_next`: Play next track
-- `usic play_prev`: Play previous track
-- `usic play_later <music_file>`: Play a specified track after the current one is over
+usic tui
+```
 
-## Playlist Management
+`play` and `later` use fuzzy matching against the local music library. If `query` is omitted, the CLI prompts for one.
 
-- `usic load <playlist_file>`: Load a playlist
-- `usic get_list`: Show the current playlist, the playing track is at the top of the list
+Playlist files are managed from the TUI and stored as plain text files in `music_dir/playlists`, one track per line. Tracks are stored as paths relative to `music_dir`. `All` is a virtual playlist backed by scanning `music_dir`.
 
-## Playback Control
+## TUI
 
-- `usic seek_forward`: Move cursor forward
-- `usic seek_backward`: Move cursor backward
-- `usic seek_to <MM:SS>`: Seek cursor to specific time
-- `usic get_progress`: Show current playback progress
+`usic tui` starts a terminal client. It does not play audio directly; it sends the same IPC commands as the CLI.
 
-## Volume Control
+Common keys:
 
-- `usic volume_up`: Increase volume
-- `usic volume_down`: Decrease volume
-- `usic set_volume <level>`: Set volume (0-1)
-- `usic get_volume`: Show the current volume
-- `usic mute`: Toggle mute
+- `space`: pause/resume
+- `n` / `p`: next/previous
+- `j` / `k`: move down/up in the playlist
+- `left` / `right`: seek backward/forward
+- `+` / `-`: volume up/down
+- `m`: mute
+- `s`: cycle play mode
+- `/`: search tracks; `enter` plays the selected result, `tab` queues it for later
+- `l`: queue the selected playlist track for later
+- `o`: focus playlists
+- `c`: create a playlist from selected tracks
+- `a` / `d`: multi-select tracks and add/remove them from a playlist
+- In fuzzy/multi-select lists, use `up` / `down`, `ctrl-j` / `ctrl-k`, or `ctrl-n` / `ctrl-p` to move without typing `j`/`k`
+- `q`: quit TUI
 
-## Play Mode
+## Configuration
 
-- `usic set_mode`: Set the play mode, the argument should be one of [sequence, shuffle, single]
-- `usic get_mode`: Show the current play mode
+Example:
 
-# Configuration
-
-`usic` is configured by editing `src/config.h`, where more details can be found.
-
-# License
-
-This project is licensed under the [MIT License](https://opensource.org/licenses/MIT).
+```toml
+music_dir = "/Users/me/Music"
+default_playlist = "All"
+default_mode = "sequence"
+volume_step = 0.1
+seek_step_secs = 10
+scan_extensions = ["mp3", "flac", "wav", "ogg", "m4a"]
+socket_path = "/Users/me/.local/state/usic/usic.sock"
+```
