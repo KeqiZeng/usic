@@ -5,6 +5,8 @@ use std::fs::{self, File};
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::Path;
+#[cfg(target_os = "macos")]
+use std::process::{Child, Command, Stdio};
 use std::sync::mpsc::{self, Sender};
 use std::sync::Arc;
 use std::time::Duration;
@@ -25,6 +27,7 @@ fn run(cfg: Config) -> Result<()> {
         .with_context(|| format!("failed to bind {}", cfg.socket_path.display()))?;
     let (event_tx, event_rx) = mpsc::channel();
     spawn_accept_thread(listener, event_tx.clone());
+    let _macos_media = start_macos_media_bridge(&cfg.socket_path);
 
     let mut player = Player::new(cfg.clone(), event_tx)?;
     eprintln!("usic-server listening on {}", cfg.socket_path.display());
@@ -144,6 +147,10 @@ impl Player {
             }
             Request::TogglePause => {
                 self.toggle_pause();
+                ipc::ok_empty()
+            }
+            Request::SetPaused { paused } => {
+                self.set_paused(paused);
                 ipc::ok_empty()
             }
             Request::Next => {
@@ -290,8 +297,12 @@ impl Player {
     }
 
     fn toggle_pause(&mut self) {
-        self.paused = !self.paused;
-        if self.paused {
+        self.set_paused(!self.paused);
+    }
+
+    fn set_paused(&mut self, paused: bool) {
+        self.paused = paused;
+        if paused {
             self.sink.pause();
         } else {
             self.sink.play();
@@ -366,6 +377,36 @@ impl Player {
             queue_len: self.playlist.tracks.len(),
         }
     }
+}
+
+#[cfg(target_os = "macos")]
+fn start_macos_media_bridge(socket_path: &Path) -> Option<Child> {
+    let helper = std::env::current_exe()
+        .ok()
+        .map(|path| path.with_file_name("usic-macos-media"))
+        .filter(|path| path.is_file());
+    let mut command = match helper {
+        Some(path) => Command::new(path),
+        None => Command::new("usic-macos-media"),
+    };
+    match command
+        .arg(socket_path)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+    {
+        Ok(child) => Some(child),
+        Err(err) => {
+            eprintln!("failed to start usic-macos-media: {err}");
+            None
+        }
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn start_macos_media_bridge(_socket_path: &Path) -> Option<()> {
+    None
 }
 
 fn load_runtime_playlist(cfg: &Config, name: &str, rebuild_if_empty: bool) -> Result<Playlist> {

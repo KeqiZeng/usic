@@ -17,6 +17,7 @@ pub enum SeekTarget {
 pub enum Request {
     Play { track: Option<String> },
     TogglePause,
+    SetPaused { paused: bool },
     Next,
     Prev,
     PlayLater { track: String },
@@ -32,7 +33,7 @@ pub enum Request {
     Quit,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Status {
     pub current_track: Option<String>,
     pub position_secs: u64,

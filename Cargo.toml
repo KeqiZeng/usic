@@ -3,6 +3,7 @@ name = "usic"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
+build = "build.rs"
 
 [dependencies]
 anyhow = "1.0"

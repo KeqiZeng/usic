@@ -49,6 +49,12 @@ usic tui
 
 Playlist files are managed from the TUI and stored as plain text files in `music_dir/playlists`, one track per line. Tracks are stored as paths relative to `music_dir`. `All` is a virtual playlist backed by scanning `music_dir`.
 
+## macOS Media Controls
+
+On macOS, Cargo builds a small Swift sidecar named `usic-macos-media` next to `usic-server`. `usic-server` starts it automatically, and the sidecar registers with the system media remote command center. AirPods and system media controls can send play, pause, toggle pause, next, and previous commands to the server. AirPods volume gestures are handled by macOS as output-device volume and are not mirrored into usic's app-level volume setting.
+
+`cargo install --path .` installs the Rust binaries only. For macOS media controls after installation, put `usic-macos-media` next to `usic-server` or somewhere in `PATH`.
+
 ## TUI
 
 `usic tui` starts a terminal client. It does not play audio directly; it sends the same IPC commands as the CLI.
@@ -66,7 +72,7 @@ Common keys:
 - `l`: queue the selected playlist track for later
 - `o`: focus playlists
 - `c`: create a playlist from selected tracks
-- `a` / `d`: multi-select tracks and add/remove them from a playlist
+- `a` / `r`: multi-select tracks and add/remove them from a playlist
 - In fuzzy/multi-select lists, use `up` / `down`, `ctrl-j` / `ctrl-k`, or `ctrl-n` / `ctrl-p` to move without typing `j`/`k`
 - `q`: quit TUI
 
